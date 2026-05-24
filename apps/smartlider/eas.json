@@ -1,0 +1,40 @@
+{
+  "cli": {
+    "version": ">= 19.0.0",
+    "requireCommit": false
+  },
+  "build": {
+    "development": {
+
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleDebug"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "npm_config_legacy_peer_deps": "true",
+        "EAS_BUILD_SKIP_LOCKFILE_CHECK": "1",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://yfxkgwlxoszbapvgtpee.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_oRxhlp63DarozDxE2ZDRZg_rDG_oPh_"
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "simulator": false
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "app-bundle"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

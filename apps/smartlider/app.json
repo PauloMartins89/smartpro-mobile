@@ -1,0 +1,61 @@
+{
+  "expo": {
+    "name": "SmartL�der",
+    "slug": "smartlider",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "scheme": "smartlider",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "br.smartpro.smartlider"
+    },
+    "android": {
+      "package": "br.smartpro.smartlider",
+      "versionCode": 2,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Permite tirar fotos de apontamentos"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 24,
+            "targetSdkVersion": 35,
+            "compileSdkVersion": 35,
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
+          }
+        }
+      ],
+      ["./plugins/withAbiFilters", { "abiFilters": ["arm64-v8a", "armeabi-v7a"] }]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "owner": "paulo_martins",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "1f379ffd-098a-4c7c-aa93-b729ed5dfdda"
+      }
+    }
+  }
+}

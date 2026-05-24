@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartBoletim — Preview Design</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #E5E7EB; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 24px; }
+  h1 { text-align: center; color: #374151; font-size: 14px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 24px; }
+
+  .phones { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+  .phone { width: 375px; height: 812px; background: #fff; border-radius: 40px; overflow: hidden; box-shadow: 0 25px 60px rgba(0,0,0,0.25), 0 0 0 1px #D1D5DB; position: relative; flex-shrink: 0; }
+  .screen { width: 100%; height: 100%; overflow: hidden; position: relative; }
+  .screen-label { position: absolute; top: -24px; left: 50%; transform: translateX(-50%); font-size: 11px; font-weight: 700; color: #6B7280; letter-spacing: 1px; text-transform: uppercase; white-space: nowrap; }
+  .status-bar { height: 44px; background: #fff; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; }
+  .status-time { font-size: 15px; font-weight: 700; color: #0D1B2A; }
+  .status-icons { display: flex; gap: 5px; align-items: center; font-size: 12px; color: #0D1B2A; }
+
+  /* ========== LOGIN ========== */
+  .login-screen { background: #fff; height: calc(100% - 44px); display: flex; flex-direction: column; justify-content: center; padding: 28px; }
+  .logo-section { display: flex; flex-direction: column; align-items: center; margin-bottom: 28px; }
+  .logo-circle { width: 88px; height: 88px; border-radius: 50%; background: linear-gradient(135deg, #4ADE80 0%, #06B6D4 50%, #3B82F6 100%); display: flex; align-items: center; justify-content: center; margin-bottom: 12px; box-shadow: 0 8px 24px rgba(6,182,212,0.3); }
+  .logo-circle svg { width: 44px; height: 44px; }
+  .app-name { font-size: 24px; font-weight: 800; color: #0D1B2A; letter-spacing: 0.5px; }
+  .tagline { font-size: 11px; font-weight: 600; color: #06B6D4; letter-spacing: 3px; margin-top: 4px; }
+  .form-card { background: #F8FAFC; border-radius: 20px; padding: 22px; border: 1px solid #E2E8F0; }
+  .form-title { font-size: 15px; font-weight: 700; color: #0D1B2A; margin-bottom: 16px; }
+  .input-wrapper { margin-bottom: 12px; }
+  .input-label { font-size: 11px; font-weight: 600; color: #374151; margin-bottom: 5px; display: block; letter-spacing: 0.3px; }
+  .fake-input { background: #fff; border: 1.5px solid #D1D5DB; border-radius: 12px; padding: 12px 14px; color: #9CA3AF; font-size: 14px; }
+  .login-btn { background: #0D1B2A; border-radius: 12px; padding: 15px; text-align: center; color: #fff; font-size: 15px; font-weight: 700; margin-top: 6px; letter-spacing: 0.5px; cursor: pointer; }
+  .secure-note { text-align: center; color: #9CA3AF; font-size: 11px; margin-top: 12px; }
+
+  /* ========== HOME ========== */
+  .home-screen { background: #fff; height: calc(100% - 44px - 68px); padding: 0 16px; overflow-y: auto; }
+  .home-header { display: flex; justify-content: space-between; align-items: center; padding-top: 16px; margin-bottom: 18px; }
+  .greeting { font-size: 20px; font-weight: 800; color: #0D1B2A; }
+  .date-text { font-size: 12px; color: #6B7280; margin-top: 2px; }
+  .new-btn { background: #0D1B2A; border-radius: 10px; padding: 8px 14px; display: flex; align-items: center; gap: 4px; }
+  .new-btn span { color: #fff; font-size: 13px; font-weight: 700; }
+  .kpi-row { display: flex; gap: 10px; margin-bottom: 20px; }
+  .kpi-card { flex: 1; background: #F8FAFC; border-radius: 14px; padding: 12px; border-top: 3px solid; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .kpi-value { font-size: 26px; font-weight: 800; color: #0D1B2A; }
+  .kpi-label { font-size: 11px; font-weight: 600; color: #6B7280; margin-top: 2px; }
+  .section-title { font-size: 11px; font-weight: 800; color: #9CA3AF; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px; }
+  .boletim-card { background: #fff; border: 1px solid #E2E8F0; border-radius: 14px; padding: 13px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+  .card-left { display: flex; align-items: center; gap: 10px; }
+  .status-dot { width: 9px; height: 9px; border-radius: 50%; }
+  .card-title { font-size: 14px; font-weight: 600; color: #0D1B2A; }
+  .card-sub { font-size: 11px; color: #6B7280; margin-top: 2px; }
+  .badge { border-radius: 8px; padding: 3px 9px; font-size: 11px; font-weight: 700; }
+
+  /* ========== TAB BAR ========== */
+  .tab-bar { height: 68px; background: #fff; border-top: 1px solid #E2E8F0; display: flex; align-items: center; justify-content: space-around; padding: 0 4px; position: absolute; bottom: 0; left: 0; right: 0; }
+  .tab-item { display: flex; flex-direction: column; align-items: center; gap: 3px; flex: 1; cursor: pointer; padding-top: 4px; }
+  .tab-icon { font-size: 20px; color: #9CA3AF; }
+  .tab-icon.active { color: #0D1B2A; }
+  .tab-label { font-size: 10px; font-weight: 600; color: #9CA3AF; }
+  .tab-label.active { color: #0D1B2A; }
+  .tab-fab-wrapper { display: flex; flex-direction: column; align-items: center; margin-top: -18px; flex: 1; }
+  .tab-fab { width: 56px; height: 56px; border-radius: 50%; background: #0D1B2A; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(13,27,42,0.4); }
+  .tab-fab span { color: #fff; font-size: 28px; line-height: 1; }
+
+  /* ========== HISTORY ========== */
+  .hist-screen { background: #fff; height: calc(100% - 44px - 68px); padding: 0 16px; overflow-y: auto; }
+  .page-title { font-size: 22px; font-weight: 800; color: #0D1B2A; padding-top: 16px; margin-bottom: 20px; }
+</style>
+</head>
+<body>
+<h1>SmartBoletim — Preview Visual Design</h1>
+<div class="phones">
+
+  <!-- TELA DE LOGIN -->
+  <div style="position:relative; padding-top: 28px;">
+    <div class="phone">
+      <div class="screen">
+        <div class="screen-label">LOGIN</div>
+        <div class="status-bar">
+          <span class="status-time">9:41</span>
+          <div class="status-icons">
+            <span>●●●</span>
+            <span>WiFi</span>
+            <span>🔋</span>
+          </div>
+        </div>
+        <div class="login-screen">
+          <div class="logo-section">
+            <div class="logo-circle">
+              <svg viewBox="0 0 44 44" fill="none">
+                <rect x="6" y="28" width="7" height="10" rx="2" fill="white" opacity="0.9"/>
+                <rect x="16" y="20" width="7" height="18" rx="2" fill="white" opacity="0.9"/>
+                <rect x="26" y="12" width="7" height="26" rx="2" fill="white" opacity="0.9"/>
+                <polyline points="9,24 19,16 29,8" stroke="white" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.7"/>
+              </svg>
+            </div>
+            <div class="app-name">SmartBoletim</div>
+            <div class="tagline">GESTÃO • INTELIGENTE</div>
+          </div>
+          <div class="form-card">
+            <div class="form-title">Entrar na sua conta</div>
+            <div class="input-wrapper">
+              <span class="input-label">E-mail</span>
+              <div class="fake-input">seu@email.com</div>
+            </div>
+            <div class="input-wrapper">
+              <span class="input-label">Senha</span>
+              <div class="fake-input">••••••••</div>
+            </div>
+            <div class="login-btn">Entrar</div>
+            <div class="secure-note">🔒  Conexão segura e criptografada</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TELA HOME -->
+  <div style="position:relative; padding-top: 28px;">
+    <div class="phone">
+      <div class="screen">
+        <div class="screen-label">HOME</div>
+        <div class="status-bar" style="background:#fff;">
+          <span class="status-time">9:41</span>
+          <div class="status-icons"><span>●●●</span><span>WiFi</span><span>🔋</span></div>
+        </div>
+        <div class="home-screen">
+          <div class="home-header">
+            <div>
+              <div class="greeting">Bom dia, paulo</div>
+              <div class="date-text">sexta-feira, 23 de maio</div>
+            </div>
+            <div class="new-btn">
+              <span style="font-size:18px; line-height:1;">+</span>
+              <span>Novo</span>
+            </div>
+          </div>
+
+          <div class="kpi-row">
+            <div class="kpi-card" style="border-top-color:#06B6D4;">
+              <div class="kpi-value">8</div>
+              <div class="kpi-label">Hoje</div>
+            </div>
+            <div class="kpi-card" style="border-top-color:#22C55E;">
+              <div class="kpi-value">5</div>
+              <div class="kpi-label">Processados</div>
+            </div>
+            <div class="kpi-card" style="border-top-color:#F59E0B;">
+              <div class="kpi-value">3</div>
+              <div class="kpi-label">Pendentes</div>
+            </div>
+          </div>
+
+          <div class="section-title">Boletins de hoje</div>
+
+          <div class="boletim-card">
+            <div class="card-left">
+              <div class="status-dot" style="background:#22C55E;"></div>
+              <div>
+                <div class="card-title">Escavadeira CAT 336</div>
+                <div class="card-sub">08:14</div>
+              </div>
+            </div>
+            <div class="badge" style="background:#DCFCE7; color:#16A34A;">Processado</div>
+          </div>
+
+          <div class="boletim-card">
+            <div class="card-left">
+              <div class="status-dot" style="background:#F59E0B;"></div>
+              <div>
+                <div class="card-title">Retroescavadeira JCB</div>
+                <div class="card-sub">09:52</div>
+              </div>
+            </div>
+            <div class="badge" style="background:#FEF3C7; color:#D97706;">Revisar</div>
+          </div>
+
+          <div class="boletim-card">
+            <div class="card-left">
+              <div class="status-dot" style="background:#22C55E;"></div>
+              <div>
+                <div class="card-title">Compactador Dynapac</div>
+                <div class="card-sub">10:30</div>
+              </div>
+            </div>
+            <div class="badge" style="background:#DCFCE7; color:#16A34A;">Processado</div>
+          </div>
+
+          <div class="boletim-card">
+            <div class="card-left">
+              <div class="status-dot" style="background:#EF4444;"></div>
+              <div>
+                <div class="card-title">Motoniveladora Volvo</div>
+                <div class="card-sub">11:05</div>
+              </div>
+            </div>
+            <div class="badge" style="background:#FEE2E2; color:#DC2626;">Não encontrado</div>
+          </div>
+
+          <div class="boletim-card">
+            <div class="card-left">
+              <div class="status-dot" style="background:#F59E0B;"></div>
+              <div>
+                <div class="card-title">Caminhão Mercedes 2428</div>
+                <div class="card-sub">11:47</div>
+              </div>
+            </div>
+            <div class="badge" style="background:#FEF3C7; color:#D97706;">Revisar</div>
+          </div>
+        </div>
+
+        <!-- TAB BAR -->
+        <div class="tab-bar">
+          <div class="tab-item">
+            <div class="tab-icon active">⌂</div>
+            <div class="tab-label active">Início</div>
+          </div>
+          <div class="tab-item">
+            <div class="tab-icon">✓</div>
+            <div class="tab-label">Aprovações</div>
+          </div>
+          <div class="tab-fab-wrapper">
+            <div class="tab-fab"><span>+</span></div>
+          </div>
+          <div class="tab-item">
+            <div class="tab-icon">🔔</div>
+            <div class="tab-label">Avisos</div>
+          </div>
+          <div class="tab-item">
+            <div class="tab-icon">○</div>
+            <div class="tab-label">Perfil</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TELA HISTÓRICO -->
+  <div style="position:relative; padding-top: 28px;">
+    <div class="phone">
+      <div class="screen">
+        <div class="screen-label">APROVAÇÕES / HISTÓRICO</div>
+        <div class="status-bar" style="background:#fff;">
+          <span class="status-time">9:41</span>
+          <div class="status-icons"><span>●●●</span><span>WiFi</span><span>🔋</span></div>
+        </div>
+        <div class="hist-screen">
+          <div class="page-title">Aprovações</div>
+
+          <div class="boletim-card">
+            <div class="card-left">
+              <div class="status-dot" style="background:#22C55E;"></div>
+              <div>
+                <div class="card-title">Escavadeira CAT 336</div>
+                <div class="card-sub">23/05/2026 08:14</div>
+              </div>
+            </div>
+            <div style="font-size:11px; font-weight:700; color:#22C55E;">processado</div>
+          </div>
+
+          <div class="boletim-card">
+            <div class="card-left">
+              <div class="status-dot" style="background:#F59E0B;"></div>
+              <div>
+                <div class="card-title">Retroescavadeira JCB</div>
+                <div class="card-sub">23/05/2026 09:52</div>
+              </div>
+            </div>
+            <div style="font-size:11px; font-weight:700; color:#F59E0B;">pendente_revisao</div>
+          </div>
+
+          <div class="boletim-card">
+            <div class="card-left">
+              <div class="status-dot" style="background:#EF4444;"></div>
+              <div>
+                <div class="card-title">Motoniveladora Volvo</div>
+                <div class="card-sub">23/05/2026 11:05</div>
+              </div>
+            </div>
+            <div style="font-size:11px; font-weight:700; color:#EF4444;">nao_encontrado</div>
+          </div>
+
+          <div class="boletim-card">
+            <div class="card-left">
+              <div class="status-dot" style="background:#22C55E;"></div>
+              <div>
+                <div class="card-title">Compactador Dynapac</div>
+                <div class="card-sub">22/05/2026 14:30</div>
+              </div>
+            </div>
+            <div style="font-size:11px; font-weight:700; color:#22C55E;">processado</div>
+          </div>
+
+          <div class="boletim-card">
+            <div class="card-left">
+              <div class="status-dot" style="background:#6366F1;"></div>
+              <div>
+                <div class="card-title">Caminhão MB 2428</div>
+                <div class="card-sub">22/05/2026 16:00</div>
+              </div>
+            </div>
+            <div style="font-size:11px; font-weight:700; color:#6366F1;">aguardando</div>
+          </div>
+        </div>
+
+        <!-- TAB BAR -->
+        <div class="tab-bar">
+          <div class="tab-item">
+            <div class="tab-icon">⌂</div>
+            <div class="tab-label">Início</div>
+          </div>
+          <div class="tab-item">
+            <div class="tab-icon active" style="color:#0D1B2A;">✓</div>
+            <div class="tab-label active" style="color:#0D1B2A;">Aprovações</div>
+          </div>
+          <div class="tab-fab-wrapper">
+            <div class="tab-fab"><span>+</span></div>
+          </div>
+          <div class="tab-item">
+            <div class="tab-icon">🔔</div>
+            <div class="tab-label">Avisos</div>
+          </div>
+          <div class="tab-item">
+            <div class="tab-icon">○</div>
+            <div class="tab-label">Perfil</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

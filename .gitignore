@@ -1,0 +1,22 @@
+node_modules/
+.expo/
+dist/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+.env
+.env.local
+.env.production
+
+# EAS
+android/
+ios/
+
+# Scripts utilitários com chaves
+apps/smartlider/*.cjs
+scripts/

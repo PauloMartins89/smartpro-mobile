@@ -1,0 +1,13 @@
+﻿{
+    "private":  true,
+    "workspaces":  [
+                       "apps/*",
+                       "packages/*"
+                   ],
+    "name":  "smartpro-mobile",
+    "version":  "1.0.0",
+    "scripts":  {
+                    "build:smartboletim":  "eas build --platform android --profile preview --non-interactive",
+                    "smartboletim":  "npm --workspace apps/smartboletim run start"
+                }
+}
