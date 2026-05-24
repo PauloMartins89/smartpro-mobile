@@ -13,7 +13,7 @@ type Equipe  = { id: string; codigo: string; nome: string }
 
 export default function IniciarTurnoScreen() {
   const router         = useRouter()
-  const { workspaceId, setTurnoAtivo } = useLiderStore()
+  const { workspaceId, setTurnoAtivo, setWorkspaceId } = useLiderStore()
 
   const [frentes,  setFrentes]  = useState<Frente[]>([])
   const [equipes,  setEquipes]  = useState<Equipe[]>([])
@@ -24,15 +24,46 @@ export default function IniciarTurnoScreen() {
   const [loading,  setLoading]  = useState(false)
   const [fetching, setFetching] = useState(true)
 
-  // Carrega frentes
+  // Carrega frentes (auto-detecta workspace se necessário)
   useEffect(() => {
-    if (!workspaceId) return
-    supabase.from('lider_frentes').select('id, codigo, nome').eq('workspace_id', workspaceId).eq('ativo', true)
-      .order('codigo').then(({ data, error }) => {
+    let cancelled = false
+    async function carregarFrentes() {
+      let wsId = workspaceId
+
+      // Se workspaceId não está no store, busca via equipe vinculada ao líder
+      if (!wsId) {
+        const { data: authData } = await supabase.auth.getUser()
+        const uid = authData.user?.id
+        if (uid) {
+          const { data: eq } = await supabase
+            .from('lider_equipes')
+            .select('workspace_id')
+            .eq('lider_id', uid)
+            .limit(1)
+            .maybeSingle()
+          if (eq?.workspace_id) {
+            wsId = eq.workspace_id
+            if (!cancelled) setWorkspaceId(wsId)
+          }
+        }
+      }
+
+      if (!wsId) {
+        if (!cancelled) setFetching(false)
+        return
+      }
+
+      const { data, error } = await supabase
+        .from('lider_frentes').select('id, codigo, nome')
+        .eq('workspace_id', wsId).eq('ativo', true).order('codigo')
+      if (!cancelled) {
         if (!error && data) setFrentes(data)
         setFetching(false)
-      })
-  }, [workspaceId])
+      }
+    }
+    carregarFrentes()
+    return () => { cancelled = true }
+  }, [])
 
   // Carrega equipes quando frente muda
   useEffect(() => {
