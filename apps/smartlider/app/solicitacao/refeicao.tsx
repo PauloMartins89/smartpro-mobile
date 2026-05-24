@@ -2,7 +2,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Alert, ActivityIndicator, Platform,
+  TextInput, Alert, ActivityIndicator, Platform, Modal,
 } from 'react-native'
 import { useNavigation, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -81,10 +81,11 @@ export default function SolicitarRefeicaoScreen() {
   const [marcacoes,     setMarcacoes] = useState({})
   const [extras,        setExtras]    = useState([])
   const [observacoes,   setObs]       = useState('')
+  const [restModalVisible, setRestModalVisible] = useState(false)
 
   // ── Carrega dados ────────────────────────────────────────────────────────
   useEffect(() => {
-    nav.setOptions({ title: 'Solicitar Refeicao' })
+    nav.setOptions({ headerShown: false })
     if (!turnoAtivo) { setLoading(false); return }
 
     async function load() {
@@ -101,7 +102,14 @@ export default function SolicitarRefeicaoScreen() {
       ])
 
       setRefeiEq(equipes || [])
-      if (equipes && equipes.length === 1) setRefeiEqId(equipes[0].id)
+      const matchedEq = equipes?.find(
+        e => e.cdc === turnoAtivo?.equipe_nome || e.cdc === turnoAtivo?.equipe_codigo
+      )
+      if (matchedEq) {
+        setRefeiEqId(matchedEq.id)
+      } else if (equipes && equipes.length === 1) {
+        setRefeiEqId(equipes[0].id)
+      }
       setRests(rests || [])
       if (rests && rests.length === 1) setRestId(rests[0].id)
       setLoading(false)
@@ -311,11 +319,6 @@ export default function SolicitarRefeicaoScreen() {
     <View style={st.root}>
       {/* ── Hero header escuro ── */}
       <View style={st.hero}>
-        <View style={st.heroNav}>
-          <TouchableOpacity style={st.backBtn} onPress={() => router.back()} activeOpacity={0.75}>
-            <Ionicons name="chevron-back" size={20} color="rgba(255,255,255,0.9)" />
-          </TouchableOpacity>
-        </View>
         <View style={st.heroBody}>
           <Text style={st.heroTitle}>Solicitar Refeição</Text>
           <Text style={st.heroSub}>Selecione as opções e envie para aprovação.</Text>
@@ -366,24 +369,16 @@ export default function SolicitarRefeicaoScreen() {
               <Text style={st.configLabel}>Restaurante</Text>
               {restaurantes.length === 0
                 ? <Text style={st.empty}>Nenhum cadastrado</Text>
-                : restaurantes.length === 1
-                  ? <TouchableOpacity style={[st.configField, st.configFieldActive]} activeOpacity={1}>
-                      <Ionicons name="storefront-outline" size={14} color={C.primaryDark} />
-                      <Text style={[st.configFieldTextActive, { flex: 1 }]} numberOfLines={1}>{restaurantes[0].nome}</Text>
-                      <Ionicons name="chevron-down" size={13} color={C.primaryDark} />
-                    </TouchableOpacity>
-                  : <TouchableOpacity
-                      style={[st.configField, restauranteId ? st.configFieldActive : {}]}
-                      onPress={() => {
-                        const idx = restaurantes.findIndex(r => r.id === restauranteId)
-                        setRestId(restaurantes[(idx + 1) % restaurantes.length].id)
-                      }}>
-                      <Ionicons name="storefront-outline" size={14} color={restauranteId ? C.primaryDark : C.textMuted} />
-                      <Text style={[st.configFieldText, restauranteId ? { color: C.text } : {}, { flex: 1 }]} numberOfLines={1}>
-                        {restauranteSel?.nome || 'Selecionar'}
-                      </Text>
-                      <Ionicons name="chevron-down" size={13} color={C.textMuted} />
-                    </TouchableOpacity>
+                : <TouchableOpacity
+                    style={[st.configField, restauranteId ? st.configFieldActive : {}]}
+                    onPress={() => setRestModalVisible(true)}
+                  >
+                    <Ionicons name="storefront-outline" size={14} color={restauranteId ? C.primaryDark : C.textMuted} />
+                    <Text style={[st.configFieldText, restauranteId ? { color: C.text } : {}, { flex: 1 }]} numberOfLines={1}>
+                      {restauranteSel?.nome || 'Selecionar'}
+                    </Text>
+                    <Ionicons name="chevron-down" size={13} color={C.textMuted} />
+                  </TouchableOpacity>
               }
             </View>
           </View>
@@ -406,29 +401,16 @@ export default function SolicitarRefeicaoScreen() {
             </View>
           )}
 
-          {/* Equipe */}
+          {/* Equipe (fixada ao turno) */}
           <View style={{ marginTop: 14 }}>
             <Text style={st.configLabel}>Equipe</Text>
-            {refeiEquipes.length === 0
-              ? <Text style={st.empty}>Nenhuma equipe cadastrada</Text>
-              : refeiEquipes.length === 1
-                ? <TouchableOpacity style={[st.configField, st.configFieldActive]} activeOpacity={1}>
-                    <Ionicons name="people-outline" size={14} color={C.primaryDark} />
-                    <Text style={[st.configFieldTextActive, { flex: 1 }]} numberOfLines={1}>{refeiEquipes[0].nome}</Text>
-                  </TouchableOpacity>
-                : <TouchableOpacity
-                    style={[st.configField, refeiEquipeId ? st.configFieldActive : {}]}
-                    onPress={() => {
-                      const idx = refeiEquipes.findIndex(e => e.id === refeiEquipeId)
-                      setRefeiEqId(refeiEquipes[(idx + 1) % refeiEquipes.length].id)
-                    }}>
-                    <Ionicons name="people-outline" size={14} color={refeiEquipeId ? C.primaryDark : C.textMuted} />
-                    <Text style={[st.configFieldText, refeiEquipeId ? { color: C.text } : {}, { flex: 1 }]} numberOfLines={1}>
-                      {refeiEquipes.find(e => e.id === refeiEquipeId)?.nome || 'Selecionar equipe'}
-                    </Text>
-                    <Ionicons name="chevron-down" size={13} color={C.textMuted} />
-                  </TouchableOpacity>
-            }
+            <View style={[st.configField, refeiEquipeId ? st.configFieldActive : {}]}>
+              <Ionicons name="people-outline" size={14} color={refeiEquipeId ? C.primaryDark : C.textMuted} />
+              <Text style={[st.configFieldText, refeiEquipeId ? { color: C.text } : {}, { flex: 1 }]} numberOfLines={1}>
+                {refeiEquipes.find(e => e.id === refeiEquipeId)?.nome || turnoAtivo?.equipe_nome || 'Equipe'}
+              </Text>
+              <Ionicons name="lock-closed-outline" size={12} color={C.textMuted} />
+            </View>
           </View>
 
           {/* Tipo de entrega */}
@@ -586,6 +568,39 @@ export default function SolicitarRefeicaoScreen() {
         <View style={{ height: 130 }} />
       </ScrollView>
 
+      {/* Modal — Restaurante */}
+      <Modal
+        visible={restModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setRestModalVisible(false)}
+      >
+        <TouchableOpacity style={st.modalOverlay} activeOpacity={1} onPress={() => setRestModalVisible(false)}>
+          <View style={st.modalSheet}>
+            <Text style={st.modalTitle}>Selecionar Restaurante</Text>
+            {restaurantes.map(r => (
+              <TouchableOpacity
+                key={r.id}
+                style={[st.modalItem, restauranteId === r.id && st.modalItemSel]}
+                onPress={() => { setRestId(r.id); setRestModalVisible(false) }}
+                activeOpacity={0.75}
+              >
+                <Ionicons name="storefront-outline" size={18} color={restauranteId === r.id ? C.primaryDark : C.textSub} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[st.modalItemTxt, restauranteId === r.id && st.modalItemTxtSel]}>{r.nome}</Text>
+                  {(r.valor_refeicao > 0 || r.valor_cafe > 0) && (
+                    <Text style={st.modalItemSub}>
+                      {r.valor_refeicao > 0 ? `🍴 ${fmtBRL(r.valor_refeicao)}` : ''}{r.valor_refeicao > 0 && r.valor_cafe > 0 ? '  ' : ''}{r.valor_cafe > 0 ? `☕ ${fmtBRL(r.valor_cafe)}` : ''}
+                    </Text>
+                  )}
+                </View>
+                {restauranteId === r.id && <Ionicons name="checkmark-circle" size={20} color={C.primaryDark} />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Footer fixo */}
       <View style={st.footer}>
         <View style={st.kpiRow}>
@@ -632,7 +647,7 @@ const st = StyleSheet.create({
   empty:   { fontSize: 13, color: C.textMuted, fontStyle: 'italic', paddingVertical: 8 },
 
   // ── Hero ──────────────────────────────────────────────
-  hero:         { backgroundColor: '#0C1D32', paddingHorizontal: 20, paddingBottom: 18, paddingTop: Platform.OS === 'ios' ? 54 : 16 },
+  hero:         { backgroundColor: '#0C1D32', paddingHorizontal: 20, paddingBottom: 18, paddingTop: Platform.OS === 'ios' ? 60 : 40 },
   heroNav:      { marginBottom: 8 },
   backBtn:      { width: 40, height: 40, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.13)', borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   heroBody:     { alignItems: 'center' },
@@ -708,6 +723,16 @@ const st = StyleSheet.create({
   obsSection: { paddingHorizontal: 2, marginBottom: 8 },
   obsLabel:   { fontSize: 10.5, fontWeight: '700', color: '#94A3B8', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 },
   obsInput:   { backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 16, padding: 14, minHeight: 58, fontSize: 12.5, color: '#334155' },
+
+  // ── Modal ──────────────────────────────────────────────
+  modalOverlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  modalSheet:      { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 28 },
+  modalTitle:      { fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 14 },
+  modalItem:       { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, paddingHorizontal: 12, borderRadius: 14, marginBottom: 4 },
+  modalItemSel:    { backgroundColor: '#F0FDF4', borderWidth: 1.5, borderColor: 'rgba(34,197,94,0.35)' },
+  modalItemTxt:    { fontSize: 14, fontWeight: '600', color: '#334155' },
+  modalItemTxtSel: { color: '#15803D', fontWeight: '700' },
+  modalItemSub:    { fontSize: 11, color: '#94A3B8', marginTop: 2 },
 
   // ── Footer ────────────────────────────────────────────
   footer:        { backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingHorizontal: 16, paddingTop: 10, paddingBottom: Platform.OS === 'ios' ? 30 : 14, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.09, shadowRadius: 16, elevation: 8 },
