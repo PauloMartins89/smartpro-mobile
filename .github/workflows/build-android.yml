@@ -54,3 +54,15 @@ jobs:
           path: apps/smartlider/build.apk
           retention-days: 30
           if-no-files-found: error
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DATE=$(date '+%d/%m/%Y %H:%M')
+          gh release create "build-${{ github.run_number }}" \
+            apps/smartlider/build.apk#smartlider.apk \
+            --repo PauloMartins89/smartpro-mobile \
+            --title "SmartLider build ${{ github.run_number }}" \
+            --notes "Build automático em $DATE" \
+            --latest
