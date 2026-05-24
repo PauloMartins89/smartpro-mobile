@@ -19,8 +19,10 @@ export interface TurnoAtivo {
 interface LiderStore {
   turnoAtivo:  TurnoAtivo | null
   workspaceId: string
-  setTurnoAtivo:  (turno: TurnoAtivo | null) => void
-  setWorkspaceId: (id: string) => void
+  dashRefreshKey: number
+  setTurnoAtivo:      (turno: TurnoAtivo | null) => void
+  setWorkspaceId:     (id: string) => void
+  triggerDashRefresh: () => void
 }
 
 const useLiderStore = create<LiderStore>()(
@@ -28,12 +30,18 @@ const useLiderStore = create<LiderStore>()(
     set => ({
       turnoAtivo:  null,
       workspaceId: '',
-      setTurnoAtivo:  turno => set({ turnoAtivo: turno }),
-      setWorkspaceId: id    => set({ workspaceId: id }),
+      dashRefreshKey: 0,
+      setTurnoAtivo:      turno => set({ turnoAtivo: turno }),
+      setWorkspaceId:     id    => set({ workspaceId: id }),
+      triggerDashRefresh: ()    => set(s => ({ dashRefreshKey: s.dashRefreshKey + 1 })),
     }),
     {
       name:    'smartlider-store',
       storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({
+        turnoAtivo:  state.turnoAtivo,
+        workspaceId: state.workspaceId,
+      }),
     }
   )
 )

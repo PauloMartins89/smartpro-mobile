@@ -80,8 +80,9 @@ export default function SolicitarRefeicaoScreen() {
   const [tipoEntrega,   setTipoEntrega] = useState<'entrega' | 'retirada'>('entrega')
   const [marcacoes,     setMarcacoes] = useState({})
   const [extras,        setExtras]    = useState([])
-  const [observacoes,   setObs]       = useState('')
-  const [restModalVisible, setRestModalVisible] = useState(false)
+  const [observacoes,          setObs]                = useState('')
+  const [restModalVisible,      setRestModalVisible]   = useState(false)
+  const [supervisorTelefone,    setSupervisorTelefone] = useState('')
 
   // ── Carrega dados ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -91,7 +92,7 @@ export default function SolicitarRefeicaoScreen() {
     async function load() {
       const [{ data: equipes }, { data: rests }] = await Promise.all([
         supabase.from('refei_equipes')
-          .select('id, nome, supervisor_telefone')
+          .select('id, cdc, nome, supervisor_telefone')
           .eq('workspace_id', workspaceId)
           .order('nome'),
         supabase.from('refei_restaurantes')
@@ -107,8 +108,10 @@ export default function SolicitarRefeicaoScreen() {
       )
       if (matchedEq) {
         setRefeiEqId(matchedEq.id)
+        setSupervisorTelefone(matchedEq.supervisor_telefone || '')
       } else if (equipes && equipes.length === 1) {
         setRefeiEqId(equipes[0].id)
+        setSupervisorTelefone(equipes[0].supervisor_telefone || '')
       }
       setRests(rests || [])
       if (rests && rests.length === 1) setRestId(rests[0].id)
@@ -205,22 +208,25 @@ export default function SolicitarRefeicaoScreen() {
       const { data: sol, error: solErr } = await supabase
         .from('refei_solicitacoes')
         .insert({
-          workspace_id:    workspaceId,
-          owner_id:        userId,
-          equipe_id:       refeiEquipeId || null,
-          restaurante_id:  restauranteId,
-          data_refeicao:   dataRefeicao,
-          numero_pedido:   numeroPedido,
-          status:          'aguardando_aprovacao',
-          total_refeicoes: totais.qtdRef,
-          total_cafes:     totais.qtdCafe,
-          valor_refeicao:  totais.vRef,
-          valor_cafe:      totais.vCafe,
-          valor_total:     totais.total,
-          observacoes:     observacoes || null,
-          lider_nome:      turnoAtivo.lider_nome,
-          token_lider:     uuidv4(),
-          token_aprovacao: uuidv4(),
+          workspace_id:         workspaceId,
+          owner_id:             userId,
+          lider_id:             userId,
+          equipe_id:            refeiEquipeId || null,
+          restaurante_id:       restauranteId,
+          data_refeicao:        dataRefeicao,
+          numero_pedido:        numeroPedido,
+          status:               'aguardando_aprovacao',
+          tipo_entrega:         tipoEntrega,
+          total_refeicoes:      totais.qtdRef,
+          total_cafes:          totais.qtdCafe,
+          valor_refeicao:       totais.vRef,
+          valor_cafe:           totais.vCafe,
+          valor_total:          totais.total,
+          observacoes:          observacoes || null,
+          lider_nome:           turnoAtivo.lider_nome,
+          supervisor_telefone:  supervisorTelefone || null,
+          token_lider:          uuidv4(),
+          token_aprovacao:      uuidv4(),
         })
         .select('id')
         .single()
@@ -317,31 +323,32 @@ export default function SolicitarRefeicaoScreen() {
 
   return (
     <View style={st.root}>
-      {/* ── Hero header escuro ── */}
-      <View style={st.hero}>
-        <View style={st.heroBody}>
-          <Text style={st.heroTitle}>Solicitar Refeição</Text>
-          <Text style={st.heroSub}>Selecione as opções e envie para aprovação.</Text>
-          <View style={st.heroChips}>
-            {turnoAtivo && (
-              <View style={st.heroChip}>
-                <Ionicons name="people" size={12} color="#4ADE80" />
-                <Text style={st.heroChipText} numberOfLines={1}>
-                  {turnoAtivo.equipe_codigo || turnoAtivo.equipe_nome || 'Equipe'} · {(TURNO_LABEL[turnoAtivo.turno] || turnoAtivo.turno || '').toUpperCase()}
-                </Text>
-              </View>
-            )}
-            {turnoAtivo && (
-              <View style={st.heroChip}>
-                <Ionicons name="person" size={12} color="#4ADE80" />
-                <Text style={st.heroChipText} numberOfLines={1}>{turnoAtivo.lider_email || turnoAtivo.lider_nome}</Text>
-              </View>
-            )}
+      <ScrollView contentContainerStyle={st.scroll} showsVerticalScrollIndicator={false}>
+
+        {/* ── Hero header escuro ── */}
+        <View style={st.hero}>
+          <View style={st.heroBody}>
+            <Text style={st.heroTitle}>Solicitar Refeição</Text>
+            <Text style={st.heroSub}>Selecione as opções e envie para aprovação.</Text>
+            <View style={st.heroChips}>
+              {turnoAtivo && (
+                <View style={st.heroChip}>
+                  <Ionicons name="people" size={12} color="#4ADE80" />
+                  <Text style={st.heroChipText} numberOfLines={1}>
+                    {turnoAtivo.equipe_codigo || turnoAtivo.equipe_nome || 'Equipe'} · {(TURNO_LABEL[turnoAtivo.turno] || turnoAtivo.turno || '').toUpperCase()}
+                  </Text>
+                </View>
+              )}
+              {turnoAtivo && (
+                <View style={st.heroChip}>
+                  <Ionicons name="person" size={12} color="#4ADE80" />
+                  <Text style={st.heroChipText} numberOfLines={1}>{turnoAtivo.lider_email || turnoAtivo.lider_nome}</Text>
+                </View>
+              )}
+            </View>
           </View>
         </View>
-      </View>
 
-      <ScrollView contentContainerStyle={st.scroll} showsVerticalScrollIndicator={false}>
 
         {/* CONFIGURAÇÃO CARD */}
         <View style={st.card}>
@@ -356,14 +363,24 @@ export default function SolicitarRefeicaoScreen() {
           <View style={st.configRow}>
             <View style={st.configCol}>
               <Text style={st.configLabel}>Data</Text>
-              <TouchableOpacity
-                style={st.configField}
-                onPress={() => { const d = new Date(dataRefeicao); d.setDate(d.getDate() + 1); setData(d.toISOString().slice(0, 10)) }}
-              >
-                <Ionicons name="calendar-outline" size={14} color={C.textSub} />
-                <Text style={[st.configFieldText, { flex: 1 }]} numberOfLines={1}>{fmtDateLong(dataRefeicao)}</Text>
-                <Ionicons name="chevron-down" size={13} color={C.textMuted} />
-              </TouchableOpacity>
+              <View style={[st.configField, { paddingHorizontal: 6 }]}>
+                <TouchableOpacity
+                  onPress={() => { const d = new Date(dataRefeicao + 'T12:00:00'); d.setDate(d.getDate() - 1); setData(d.toISOString().slice(0, 10)) }}
+                  style={st.dateArrow}
+                >
+                  <Ionicons name="chevron-back" size={16} color={C.textSub} />
+                </TouchableOpacity>
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  <Ionicons name="calendar-outline" size={13} color={C.textSub} />
+                  <Text style={[st.configFieldText, { fontSize: 11, textAlign: 'center' }]} numberOfLines={1}>{fmtDateLong(dataRefeicao)}</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => { const d = new Date(dataRefeicao + 'T12:00:00'); d.setDate(d.getDate() + 1); setData(d.toISOString().slice(0, 10)) }}
+                  style={st.dateArrow}
+                >
+                  <Ionicons name="chevron-forward" size={16} color={C.textSub} />
+                </TouchableOpacity>
+              </View>
             </View>
             <View style={st.configCol}>
               <Text style={st.configLabel}>Restaurante</Text>
@@ -667,7 +684,8 @@ const st = StyleSheet.create({
   configRow:         { flexDirection: 'row', gap: 12, marginBottom: 12 },
   configCol:         { flex: 1, minWidth: 0 },
   configLabel:       { fontSize: 10, fontWeight: '700', color: '#94A3B8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.9 },
-  configField:       { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F8FAFC', borderRadius: 13, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1.5, borderColor: '#E2E8F0' },
+  configField:       { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F8FAFC', borderRadius: 13, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1.5, borderColor: '#E2E8F0', minHeight: 44 },
+  dateArrow:         { width: 28, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: '#EEF2F7' },
   configFieldActive: { borderColor: C.primary, backgroundColor: C.greenBg },
   configFieldText:   { fontSize: 12.5, fontWeight: '600', color: '#475569' },
   configFieldTextActive: { fontSize: 12.5, fontWeight: '700', color: '#15803D' },
