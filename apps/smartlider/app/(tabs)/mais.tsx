@@ -7,6 +7,7 @@ import { C } from '../../src/lib/theme'
 
 const ITEMS = [
   { icon: 'document-text-outline', label: 'Fechar Dia / Boletim', route: '/fechamento' },
+  { icon: 'terminal-outline',      label: 'Diagnóstico / Logs',   route: '/diagnostico' },
 ]
 
 export default function MaisScreen() {

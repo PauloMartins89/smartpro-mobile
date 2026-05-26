@@ -6,6 +6,10 @@ import { supabase } from '../src/lib/supabase'
 import { useRouter, useSegments } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import useLiderStore from '../src/store/useLiderStore'
+import { initLogger } from '../src/lib/logger'
+
+// Inicia captura de logs o mais cedo possível
+initLogger()
 
 // Error boundary global — captura crashes de render em qualquer rota
 export function ErrorBoundary({ error, retry }: { error: Error; retry: () => void }) {
