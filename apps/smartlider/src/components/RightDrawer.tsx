@@ -125,7 +125,8 @@ export default function RightDrawer({ visible, onClose, turnoAtivo }: Props) {
           </TouchableOpacity>
         </View>
 
-        {/* Info do turno */}        <View style={styles.turnoCard}>
+        {/* Info do turno */}
+        <View style={styles.turnoCard}>
           <View style={styles.turnoRow}>
             <View style={styles.statusDot} />
             <Text style={styles.turnoFrente}>{turnoAtivo.frente_nome}</Text>

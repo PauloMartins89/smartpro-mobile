@@ -103,8 +103,11 @@ export default function SolicitarRefeicaoScreen() {
       ])
 
       setRefeiEq(equipes || [])
+      // 1º tenta por cdc; 2º por equipe_id do turno; 3º única equipe do workspace
       const matchedEq = equipes?.find(
-        e => e.cdc === turnoAtivo?.equipe_nome || e.cdc === turnoAtivo?.equipe_codigo
+        e => e.cdc === turnoAtivo?.equipe_nome ||
+             e.cdc === turnoAtivo?.equipe_codigo ||
+             e.id  === turnoAtivo?.equipe_id
       )
       if (matchedEq) {
         setRefeiEqId(matchedEq.id)
