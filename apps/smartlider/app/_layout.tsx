@@ -28,13 +28,20 @@ export default function RootLayout() {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      const inAuth = segments[0] === '(auth)'
-      if (!session && !inAuth) router.replace('/(auth)/login')
-      if (session  &&  inAuth) router.replace('/(tabs)')
-      if (session) fetchAndSetWorkspace(session.user.id, setWorkspaceId)
-      setReady(true)
-    })
+    const init = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const inAuth = segments[0] === '(auth)'
+        if (!session && !inAuth) router.replace('/(auth)/login')
+        if (session  &&  inAuth) router.replace('/(tabs)')
+        if (session) fetchAndSetWorkspace(session.user.id, setWorkspaceId)
+      } catch {
+        router.replace('/(auth)/login')
+      } finally {
+        setReady(true)
+      }
+    }
+    init()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       const inAuth = segments[0] === '(auth)'

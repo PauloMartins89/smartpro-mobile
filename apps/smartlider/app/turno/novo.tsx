@@ -29,50 +29,51 @@ export default function IniciarTurnoScreen() {
   useEffect(() => {
     let cancelled = false
     async function carregarFrentes() {
-      // 1) Obtém usuário autenticado
-      const { data: authData } = await supabase.auth.getUser()
-      const uid   = authData.user?.id
-      const email = authData.user?.email
-      if (!uid) { if (!cancelled) setFetching(false); return }
+      try {
+        // 1) Obtém usuário autenticado
+        const { data: authData } = await supabase.auth.getUser()
+        const uid   = authData.user?.id
+        const email = authData.user?.email
+        if (!uid) { if (!cancelled) setFetching(false); return }
 
-      // 2) Descobre workspace pelo lider_id ou lider_email
-      let wsId = ''
-      const { data: eqById } = await supabase
-        .from('lider_equipes')
-        .select('workspace_id')
-        .eq('lider_id', uid)
-        .limit(1)
-        .maybeSingle()
-      if (eqById?.workspace_id) {
-        wsId = eqById.workspace_id
-      } else if (email) {
-        // fallback: busca por email
-        const { data: eqByEmail } = await supabase
+        // 2) Descobre workspace pelo lider_id ou lider_email
+        let wsId = ''
+        const { data: eqById } = await supabase
           .from('lider_equipes')
           .select('workspace_id')
-          .eq('lider_email', email)
+          .eq('lider_id', uid)
           .limit(1)
           .maybeSingle()
-        if (eqByEmail?.workspace_id) wsId = eqByEmail.workspace_id
-      }
+        if (eqById?.workspace_id) {
+          wsId = eqById.workspace_id
+        } else if (email) {
+          const { data: eqByEmail } = await supabase
+            .from('lider_equipes')
+            .select('workspace_id')
+            .eq('lider_email', email)
+            .limit(1)
+            .maybeSingle()
+          if (eqByEmail?.workspace_id) wsId = eqByEmail.workspace_id
+        }
 
-      // 3) Fallback: usa workspaceId do store (já persistido de sessão anterior)
-      if (!wsId && workspaceId) wsId = workspaceId
+        if (!wsId && workspaceId) wsId = workspaceId
 
-      if (!wsId) { if (!cancelled) setFetching(false); return }
+        if (!wsId) { if (!cancelled) setFetching(false); return }
 
-      if (!cancelled) setWorkspaceId(wsId)
+        if (!cancelled) setWorkspaceId(wsId)
 
-      // 4) Carrega frentes do workspace
-      const { data: frs, error } = await supabase
-        .from('lider_frentes')
-        .select('id, codigo, nome')
-        .eq('workspace_id', wsId)
-        .eq('ativo', true)
-        .order('codigo')
-      if (!cancelled) {
-        if (!error && frs) setFrentes(frs)
-        setFetching(false)
+        const { data: frs, error } = await supabase
+          .from('lider_frentes')
+          .select('id, codigo, nome')
+          .eq('workspace_id', wsId)
+          .eq('ativo', true)
+          .order('codigo')
+        if (!cancelled) {
+          if (!error && frs) setFrentes(frs)
+          setFetching(false)
+        }
+      } catch {
+        if (!cancelled) setFetching(false)
       }
     }
     carregarFrentes()
@@ -94,55 +95,59 @@ export default function IniciarTurnoScreen() {
     if (!equipe)  { Alert.alert('Atenção', 'Selecione a equipe'); return }
 
     setLoading(true)
-    const { data: user } = await supabase.auth.getUser()
+    try {
+      const { data: user } = await supabase.auth.getUser()
 
-    // Busca ou cria o turno do dia
-    const { data: existing } = await supabase.from('lider_turnos')
-      .select('id, status')
-      .eq('equipe_id', equipe.id)
-      .eq('data',      data)
-      .eq('turno',     turno)
-      .single()
+      const { data: existing } = await supabase.from('lider_turnos')
+        .select('id, status')
+        .eq('equipe_id', equipe.id)
+        .eq('data',      data)
+        .eq('turno',     turno)
+        .single()
 
-    let turnoId: string
+      let turnoId: string
 
-    if (existing) {
-      turnoId = existing.id
-      if (existing.status === 'fechado') {
-        Alert.alert('Turno Fechado', 'Este turno já foi fechado e não pode ser reaberto.')
-        setLoading(false); return
+      if (existing) {
+        turnoId = existing.id
+        if (existing.status === 'fechado') {
+          Alert.alert('Turno Fechado', 'Este turno já foi fechado e não pode ser reaberto.')
+          setLoading(false); return
+        }
+      } else {
+        const { data: novo, error } = await supabase.from('lider_turnos').insert({
+          workspace_id: workspaceId,
+          frente_id:    frente.id,
+          equipe_id:    equipe.id,
+          lider_id:     user.user?.id,
+          data,
+          turno,
+          status: 'aberto',
+        }).select('id').single()
+
+        if (error) {
+          Alert.alert('Erro', 'Não foi possível iniciar o turno: ' + error.message)
+          setLoading(false); return
+        }
+        turnoId = novo.id
       }
-    } else {
-      const { data: novo, error } = await supabase.from('lider_turnos').insert({
-        workspace_id: workspaceId,
-        frente_id:    frente.id,
-        equipe_id:    equipe.id,
-        lider_id:     user.user?.id,
+
+      setTurnoAtivo({
+        id:          turnoId,
+        frente_id:   frente.id,
+        frente_nome: `${frente.codigo} · ${frente.nome}`,
+        equipe_id:   equipe.id,
+        equipe_nome: equipe.codigo,
+        lider_nome:  user.user?.user_metadata?.nome || user.user?.email || '',
         data,
         turno,
         status: 'aberto',
-      }).select('id').single()
-
-      if (error) {
-        Alert.alert('Erro', 'Não foi possível iniciar o turno: ' + error.message)
-        setLoading(false); return
-      }
-      turnoId = novo.id
+      })
+      router.replace('/(tabs)')
+    } catch (e: any) {
+      Alert.alert('Erro', 'Falha ao iniciar turno. Verifique sua conexão.')
+    } finally {
+      setLoading(false)
     }
-
-    setTurnoAtivo({
-      id:          turnoId,
-      frente_id:   frente.id,
-      frente_nome: `${frente.codigo} · ${frente.nome}`,
-      equipe_id:   equipe.id,
-      equipe_nome: equipe.codigo,
-      lider_nome:  user.user?.user_metadata?.nome || user.user?.email || '',
-      data,
-      turno,
-      status: 'aberto',
-    })
-    setLoading(false)
-    router.replace('/(tabs)')
   }
 
   const TURNOS: { id: Turno; label: string; icon: string; color: string }[] = [

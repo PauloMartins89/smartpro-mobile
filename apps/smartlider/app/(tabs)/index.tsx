@@ -50,32 +50,37 @@ export default function DashboardScreen() {
     if (!turnoAtivo) return
     isRefresh ? setRefresh(true) : setLoading(true)
 
-    const [
-      { count: presentes },
-      { count: total },
-      { count: maquinas },
-      { data: prodData },
-      { count: refeicoes },
-    ] = await Promise.all([
-      supabase.from('lider_mao_obra').select('*', { count: 'exact', head: true }).eq('turno_id', turnoAtivo.id).eq('presente', true),
-      supabase.from('lider_mao_obra').select('*', { count: 'exact', head: true }).eq('turno_id', turnoAtivo.id),
-      supabase.from('lider_apontamentos_maquina').select('*', { count: 'exact', head: true }).eq('turno_id', turnoAtivo.id),
-      supabase.from('lider_produtividade_equipe').select('realizado_ha, meta_ha').eq('turno_id', turnoAtivo.id),
-      supabase.from('refei_solicitacoes').select('*', { count: 'exact', head: true }).eq('workspace_id', workspaceId).eq('data_refeicao', turnoAtivo.data).neq('status', 'rascunho'),
-    ])
+    try {
+      const [
+        { count: presentes },
+        { count: total },
+        { count: maquinas },
+        { data: prodData },
+        { count: refeicoes },
+      ] = await Promise.all([
+        supabase.from('lider_mao_obra').select('*', { count: 'exact', head: true }).eq('turno_id', turnoAtivo.id).eq('presente', true),
+        supabase.from('lider_mao_obra').select('*', { count: 'exact', head: true }).eq('turno_id', turnoAtivo.id),
+        supabase.from('lider_apontamentos_maquina').select('*', { count: 'exact', head: true }).eq('turno_id', turnoAtivo.id),
+        supabase.from('lider_produtividade_equipe').select('realizado_ha, meta_ha').eq('turno_id', turnoAtivo.id),
+        supabase.from('refei_solicitacoes').select('*', { count: 'exact', head: true }).eq('workspace_id', workspaceId).eq('data_refeicao', turnoAtivo.data).neq('status', 'rascunho'),
+      ])
 
-    const ha_realizado = prodData?.reduce((s, r) => s + (r.realizado_ha ?? 0), 0) ?? 0
-    const ha_meta      = prodData?.reduce((s, r) => s + (r.meta_ha      ?? 0), 0) ?? 0
+      const ha_realizado = prodData?.reduce((s, r) => s + (r.realizado_ha ?? 0), 0) ?? 0
+      const ha_meta      = prodData?.reduce((s, r) => s + (r.meta_ha      ?? 0), 0) ?? 0
 
-    setDados({
-      presentes:             presentes ?? 0,
-      total_colaboradores:   total     ?? 0,
-      maquinas_ativas:       maquinas  ?? 0,
-      ha_realizado,
-      ha_meta,
-      refeicoes_solicitadas: refeicoes ?? 0,
-    })
-    isRefresh ? setRefresh(false) : setLoading(false)
+      setDados({
+        presentes:             presentes ?? 0,
+        total_colaboradores:   total     ?? 0,
+        maquinas_ativas:       maquinas  ?? 0,
+        ha_realizado,
+        ha_meta,
+        refeicoes_solicitadas: refeicoes ?? 0,
+      })
+    } catch {
+      setDados({ presentes: 0, total_colaboradores: 0, maquinas_ativas: 0, ha_realizado: 0, ha_meta: 0, refeicoes_solicitadas: 0 })
+    } finally {
+      isRefresh ? setRefresh(false) : setLoading(false)
+    }
   }, [turnoAtivo?.id, workspaceId])
 
   useEffect(() => { carregar() }, [carregar, dashRefreshKey])
