@@ -6,10 +6,7 @@ import useLiderStore from '../../src/store/useLiderStore'
 import { C } from '../../src/lib/theme'
 
 const ITEMS = [
-  { icon: 'analytics-outline',     label: 'Produtividade Equipamento', route: '/apontamento/produtividade-equipamento' },
-  { icon: 'people-circle-outline', label: 'Produtividade Equipe',      route: '/apontamento/produtividade-equipe' },
-  { icon: 'star-outline',          label: 'Avaliação da Equipe',       route: '/apontamento/avaliacao-equipe' },
-  { icon: 'document-text-outline', label: 'Fechar Dia / Boletim',      route: '/fechamento' },
+  { icon: 'document-text-outline', label: 'Fechar Dia / Boletim', route: '/fechamento' },
 ]
 
 export default function MaisScreen() {

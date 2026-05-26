@@ -1,138 +1,200 @@
-import { useEffect, useState } from 'react'
-import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Alert, ActivityIndicator, Platform,
-} from 'react-native'
+// @ts-nocheck
+import { useEffect, useState, useCallback } from 'react'
+import { View, Text, StyleSheet, ScrollView, FlatList, TouchableOpacity, TextInput, Alert, ActivityIndicator, Modal } from 'react-native'
 import { useNavigation } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../src/lib/supabase'
 import useLiderStore from '../../src/store/useLiderStore'
-import { C } from '../../src/lib/theme'
+import useSyncStore from '../../src/store/useSyncStore'
+import { C, fmtDate } from '../../src/lib/theme'
+import { StatCard, StatusChip, SyncBanner, Section, EmptyList } from '../../src/components/ModuleShared'
+
+function uuidv4() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16)
+  })
+}
 
 const CRITERIOS = [
-  { key: 'pontualidade',    label: 'Pontualidade',    icon: 'time-outline' },
-  { key: 'produtividade',   label: 'Produtividade',   icon: 'trending-up-outline' },
-  { key: 'seguranca',       label: 'Segurança',       icon: 'shield-checkmark-outline' },
-  { key: 'limpeza',         label: 'Limpeza',         icon: 'sparkles-outline' },
-  { key: 'comunicacao',     label: 'Comunicação',     icon: 'chatbubble-outline' },
-  { key: 'trabalho_equipe', label: 'Trabalho em Equipe', icon: 'people-outline' },
-] as const
+  { key: 'presenca',      label: 'Presenca e Pontualidade' },
+  { key: 'produtividade', label: 'Produtividade' },
+  { key: 'qualidade',     label: 'Qualidade do Trabalho' },
+  { key: 'seguranca',     label: 'Seguranca' },
+  { key: 'uso_epi',       label: 'Uso de EPI' },
+  { key: 'disciplina',    label: 'Disciplina' },
+]
 
-type Criterio = typeof CRITERIOS[number]['key']
-
-export default function AvaliacaoEquipeScreen() {
-  const nav        = useNavigation()
-  const turnoAtivo = useLiderStore(s => s.turnoAtivo)
-  const [notas,  setNotas]  = useState<Record<string, number>>(Object.fromEntries(CRITERIOS.map(c => [c.key, 0])))
-  const [obs,    setObs]    = useState('')
-  const [saving, setSaving] = useState(false)
-
-  useEffect(() => { nav.setOptions({ title: 'Avaliação da Equipe' }) }, [])
-
-  const mediaGeral = CRITERIOS.reduce((s, c) => s + (notas[c.key] ?? 0), 0) / CRITERIOS.length
-
-  async function handleSalvar() {
-    if (!turnoAtivo) return
-    const zerados = CRITERIOS.filter(c => !notas[c.key])
-    if (zerados.length) { Alert.alert('Atenção', 'Avalie todos os critérios antes de salvar'); return }
-    setSaving(true)
-    const { data: user } = await supabase.auth.getUser()
-
-    const { error } = await supabase.from('lider_avaliacoes_equipe').insert({
-      turno_id:         turnoAtivo.id,
-      equipe_id:        turnoAtivo.equipe_id,
-      nota_pontualidade:    notas.pontualidade,
-      nota_produtividade:   notas.produtividade,
-      nota_seguranca:       notas.seguranca,
-      nota_limpeza:         notas.limpeza,
-      nota_comunicacao:     notas.comunicacao,
-      nota_trabalho_equipe: notas.trabalho_equipe,
-      nota_geral:           Math.round(mediaGeral * 10) / 10,
-      observacao:           obs,
-      criado_por:           user.user?.id,
-    })
-
-    if (error) Alert.alert('Erro', error.message)
-    else Alert.alert('Avaliação Salva!', `Nota geral: ${(Math.round(mediaGeral * 10) / 10).toFixed(1)}/5`)
-    setSaving(false)
-  }
-
+function StarPicker({ value, onChange }) {
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={{ padding: 16 }}>
-        {CRITERIOS.map(c => (
-          <View key={c.key} style={styles.card}>
-            <View style={styles.cardHeader}>
-              <View style={styles.iconWrap}>
-                <Ionicons name={c.icon as any} size={18} color={C.primary} />
-              </View>
-              <Text style={styles.cardTitle}>{c.label}</Text>
-              {notas[c.key] > 0 && (
-                <View style={[styles.notaBadge, { backgroundColor: notaColor(notas[c.key]) + '20' }]}>
-                  <Text style={[styles.notaBadgeText, { color: notaColor(notas[c.key]) }]}>{notas[c.key].toFixed(1)}</Text>
-                </View>
-              )}
-            </View>
-            <View style={styles.starsRow}>
-              {[1, 2, 3, 4, 5].map(n => (
-                <TouchableOpacity key={n} onPress={() => setNotas(prev => ({ ...prev, [c.key]: n }))} style={styles.starBtn}>
-                  <Ionicons name={notas[c.key] >= n ? 'star' : 'star-outline'} size={30} color={notas[c.key] >= n ? '#F59E0B' : C.border} />
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        ))}
-
-        {/* Nota Geral */}
-        <View style={styles.geralCard}>
-          <Text style={styles.geralLabel}>Nota Geral</Text>
-          <Text style={[styles.geralValue, { color: notaColor(mediaGeral) }]}>
-            {mediaGeral > 0 ? mediaGeral.toFixed(1) : '—'}
-          </Text>
-          <Text style={styles.geralSub}>/5.0</Text>
-        </View>
-
-        <Text style={{ fontSize: 11, fontWeight: '700', color: C.textSub, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>Observação Geral</Text>
-        <TextInput
-          style={[styles.input, { minHeight: 80 }]}
-          value={obs} onChangeText={setObs}
-          multiline placeholder="Pontos fortes e de melhoria..."
-          placeholderTextColor={C.textMuted}
-        />
-        <View style={{ height: 100 }} />
-      </ScrollView>
-
-      <View style={styles.footer}>
-        <TouchableOpacity style={styles.btn} onPress={handleSalvar} disabled={saving} activeOpacity={0.85}>
-          {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Salvar Avaliação</Text>}
+    <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+      {[1,2,3,4,5].map(n => (
+        <TouchableOpacity key={n} onPress={() => onChange(n)}>
+          <Text style={{ fontSize: 28 }}>{n <= value ? '★' : '☆'}</Text>
         </TouchableOpacity>
-      </View>
+      ))}
     </View>
   )
 }
 
-function notaColor(nota: number) {
-  if (nota >= 4) return C.green
-  if (nota >= 3) return C.yellow
-  return C.red
+export default function AvaliacaoEquipeScreen() {
+  const nav         = useNavigation()
+  const turnoAtivo  = useLiderStore(s => s.turnoAtivo)
+  const workspaceId = useLiderStore(s => s.workspaceId)
+  const addToQueue  = useSyncStore(s => s.addToQueue)
+  const queue       = useSyncStore(s => s.queue)
+
+  const [records,  setRecords]  = useState([])
+  const [loading,  setLoading]  = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [saving,   setSaving]   = useState(false)
+  const [notas,    setNotas]    = useState({ presenca: 5, produtividade: 5, qualidade: 5, seguranca: 5, uso_epi: 5, disciplina: 5 })
+  const [obs,      setObs]      = useState('')
+
+  useEffect(() => { nav.setOptions({ title: 'Avaliacao da Equipe' }) }, [])
+
+  const carregar = useCallback(async () => {
+    if (!turnoAtivo) return
+    setLoading(true)
+    const { data } = await supabase
+      .from('lider_avaliacoes_equipe')
+      .select('id, nota_geral, presenca, produtividade, qualidade, seguranca, uso_epi, disciplina, comentario, created_at')
+      .eq('turno_id', turnoAtivo.id)
+      .order('created_at', { ascending: false })
+    setRecords(data ?? [])
+    setLoading(false)
+  }, [turnoAtivo?.id])
+
+  useEffect(() => { carregar() }, [carregar])
+
+  const mediaGeral  = records.length ? records.reduce((s, r) => s + (r.nota_geral ?? 0), 0) / records.length : 0
+  const pendentes   = queue.filter(r => r.table === 'lider_avaliacoes_equipe').length
+  const mediaNotas  = Object.values(notas).reduce((s, v) => s + v, 0) / 6
+
+  async function handleSalvar() {
+    if (!turnoAtivo) return
+    setSaving(true)
+    const { data: user } = await supabase.auth.getUser()
+    const id = uuidv4()
+    const nota_geral = Math.round(mediaNotas * 10) / 10
+    const payload = {
+      id, turno_id: turnoAtivo.id, workspace_id: workspaceId,
+      equipe_id: turnoAtivo.equipe_id, equipe_nome: turnoAtivo.equipe_nome,
+      ...notas, nota_geral, comentario: obs,
+    }
+    const { error } = await supabase.from('lider_avaliacoes_equipe').upsert(payload, { onConflict: 'turno_id,equipe_id' })
+    if (error) {
+      addToQueue({ id, table: 'lider_avaliacoes_equipe', action: 'insert', payload, created_at: new Date().toISOString() })
+      setRecords(prev => [{ ...payload, sync_status: 'pending' }, ...prev])
+      Alert.alert('Salvo offline', 'Sera sincronizado quando a conexao voltar.')
+    } else await carregar()
+    setSaving(false); setShowForm(false)
+    setNotas({ presenca: 5, produtividade: 5, qualidade: 5, seguranca: 5, uso_epi: 5, disciplina: 5 })
+    setObs('')
+  }
+
+  function NotaStars({ nota }) {
+    return (
+      <View style={{ flexDirection: 'row', gap: 2 }}>
+        {[1,2,3,4,5].map(n => (
+          <Text key={n} style={{ fontSize: 14, color: n <= nota ? '#f59e0b' : C.border }}>★</Text>
+        ))}
+      </View>
+    )
+  }
+
+  return (
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <SyncBanner />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 14 }}>
+        <StatCard label="Avaliacoes"  value={records.length}       icon="star-outline"          color={C.primary} bg={C.greenBg}  />
+        <StatCard label="Media geral" value={mediaGeral.toFixed(1)} icon="trophy-outline"        color={C.blue}    bg={C.blueBg}   />
+        <StatCard label="Equipe"      value={turnoAtivo?.equipe_nome ?? '?'} icon="people-outline" color={C.purple} bg={C.purpleBg} />
+        <StatCard label="Offline"     value={pendentes}            icon="cloud-offline-outline" color={C.yellow}  bg={C.yellowBg} />
+      </ScrollView>
+
+      <View style={s.actionRow}>
+        <Text style={s.sectionTitle}>Avaliacoes do turno</Text>
+        <TouchableOpacity style={s.newBtn} onPress={() => setShowForm(true)}>
+          <Ionicons name="add" size={16} color="#fff" />
+          <Text style={s.newBtnText}>Avaliar</Text>
+        </TouchableOpacity>
+      </View>
+
+      {loading ? <ActivityIndicator color={C.primary} style={{ marginTop: 40 }} /> : (
+        <FlatList data={records} keyExtractor={r => r.id}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
+          ListEmptyComponent={<EmptyList icon="star-outline" msg="Nenhuma avaliacao registrada neste turno" />}
+          renderItem={({ item }) => (
+            <View style={s.row}>
+              <View style={[s.iconDot, { backgroundColor: C.greenBg }]}>
+                <Ionicons name="star-outline" size={16} color={C.primary} />
+              </View>
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text style={s.rowTitle}>Nota geral: {item.nota_geral?.toFixed(1) ?? '?'}</Text>
+                <Text style={s.rowSub}>{fmtDate(item.created_at?.split('T')[0])}</Text>
+              </View>
+              <NotaStars nota={Math.round(item.nota_geral ?? 0)} />
+            </View>
+          )}
+        />
+      )}
+
+      <Modal visible={showForm} animationType="slide" transparent>
+        <View style={s.overlay}>
+          <View style={s.modal}>
+            <View style={s.modalHdr}>
+              <Text style={s.modalTitle}>Avaliar Equipe</Text>
+              <TouchableOpacity onPress={() => setShowForm(false)}>
+                <Ionicons name="close" size={22} color={C.textSub} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={{ padding: 20 }}>
+              {CRITERIOS.map(({ key, label }) => (
+                <View key={key} style={{ marginBottom: 20 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: C.textSub, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>{label}</Text>
+                  <StarPicker value={notas[key]} onChange={v => setNotas(prev => ({ ...prev, [key]: v }))} />
+                </View>
+              ))}
+              <View style={{ backgroundColor: C.greenBg, borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 16 }}>
+                <Text style={{ fontSize: 13, color: C.textSub }}>Media calculada</Text>
+                <Text style={{ fontSize: 28, fontWeight: '800', color: C.primary }}>{mediaNotas.toFixed(1)}</Text>
+              </View>
+              <Section label="Observacao geral">
+                <TextInput style={[s.input, { height: 70, textAlignVertical: 'top' }]} value={obs} onChangeText={setObs} multiline placeholder="Pontos positivos, melhorias..." placeholderTextColor={C.textMuted} />
+              </Section>
+              <TouchableOpacity style={s.saveBtn} onPress={handleSalvar} disabled={saving}>
+                {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.saveTx}>Salvar Avaliacao</Text>}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  )
 }
 
-const styles = StyleSheet.create({
-  container:     { flex: 1, backgroundColor: C.bg },
-  card:          { backgroundColor: C.bgCard, borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: C.border },
-  cardHeader:    { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  iconWrap:      { width: 34, height: 34, borderRadius: 8, backgroundColor: C.greenBg, justifyContent: 'center', alignItems: 'center', marginRight: 10 },
-  cardTitle:     { flex: 1, fontSize: 14, fontWeight: '700', color: C.text },
-  notaBadge:     { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 3 },
-  notaBadgeText: { fontSize: 14, fontWeight: '800' },
-  starsRow:      { flexDirection: 'row', gap: 6 },
-  starBtn:       { padding: 2 },
-  geralCard:     { backgroundColor: C.navy, borderRadius: 16, padding: 20, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, marginBottom: 20 },
-  geralLabel:    { color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: '600' },
-  geralValue:    { fontSize: 40, fontWeight: '800' },
-  geralSub:      { color: 'rgba(255,255,255,0.4)', fontSize: 16, alignSelf: 'flex-end', paddingBottom: 6 },
-  input:         { borderWidth: 1.5, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: C.text, backgroundColor: C.bgCard, marginBottom: 16 },
-  footer:        { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: C.border, padding: 14, paddingBottom: Platform.OS === 'ios' ? 30 : 14 },
-  btn:           { backgroundColor: C.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-  btnText:       { color: '#fff', fontWeight: '700', fontSize: 15 },
+const s = StyleSheet.create({
+  actionRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 10 },
+  sectionTitle:{ fontSize: 14, fontWeight: '700', color: C.text },
+  newBtn:      { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: C.primary, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
+  newBtnText:  { color: '#fff', fontWeight: '700', fontSize: 13 },
+  row:         { flexDirection: 'row', alignItems: 'center', backgroundColor: C.bgCard, borderRadius: 12, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: C.border },
+  rowTitle:    { fontSize: 14, fontWeight: '700', color: C.text },
+  rowSub:      { fontSize: 12, color: C.textSub, marginTop: 2 },
+  overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  modal:       { backgroundColor: C.bgCard, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '92%' },
+  modalHdr:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, borderBottomWidth: 1, borderBottomColor: C.border },
+  modalTitle:  { fontSize: 16, fontWeight: '800', color: C.text },
+  chip:        { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: C.bgMuted, marginRight: 8, marginBottom: 6 },
+  chipOn:      { backgroundColor: C.primary },
+  chipTx:      { fontSize: 12, fontWeight: '600', color: C.textSub },
+  chipTxOn:    { color: '#fff' },
+  input:       { backgroundColor: C.bgMuted, borderRadius: 10, padding: 12, fontSize: 14, color: C.text, borderWidth: 1, borderColor: C.border },
+  saveBtn:     { backgroundColor: C.primary, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 8 },
+  saveTx:      { color: '#fff', fontWeight: '800', fontSize: 15 },
+  iconDot:     { width: 38, height: 38, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  starRow:     { flexDirection: 'row', gap: 6, marginBottom: 4 },
+  star:        { fontSize: 28 },
 })

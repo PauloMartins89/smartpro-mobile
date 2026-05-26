@@ -19,6 +19,10 @@ interface DrawerData {
   refeicoes:           number
   epis_pendentes:      number
   solicitacoes:        number
+  afericoes_reprovadas:number
+  epis_vencendo:       number
+  avaliacao_media:     number
+  insumos_divergentes: number
 }
 
 interface Props {
@@ -55,6 +59,10 @@ export default function RightDrawer({ visible, onClose, turnoAtivo }: Props) {
       { count: refeicoes },
       { count: epis },
       { count: solicitacoes },
+      { count: afericoes_reprovadas },
+      { count: epis_vencendo },
+      { data: avaliacoes },
+      { count: insumos_divergentes },
     ] = await Promise.all([
       supabase.from('lider_mao_obra').select('*', { count: 'exact', head: true }).eq('turno_id', tid).eq('presente', true),
       supabase.from('lider_mao_obra').select('*', { count: 'exact', head: true }).eq('turno_id', tid),
@@ -63,20 +71,31 @@ export default function RightDrawer({ visible, onClose, turnoAtivo }: Props) {
       supabase.from('lider_solicitacoes_refeicao').select('*', { count: 'exact', head: true }).eq('turno_id', tid),
       supabase.from('lider_solicitacoes_epi').select('*', { count: 'exact', head: true }).eq('turno_id', tid).eq('status', 'pendente'),
       supabase.from('lider_solicitacoes_insumo').select('*', { count: 'exact', head: true }).eq('turno_id', tid).eq('status', 'pendente'),
+      supabase.from('lider_afericoes').select('*', { count: 'exact', head: true }).eq('turno_id', tid).eq('status', 'reprovado'),
+      supabase.from('lider_controle_epi').select('*', { count: 'exact', head: true }).eq('turno_id', tid).in('status', ['vencendo', 'vencido']),
+      supabase.from('lider_avaliacoes_equipe').select('nota_geral').eq('turno_id', tid),
+      supabase.from('lider_apontamentos_insumo').select('*', { count: 'exact', head: true }).eq('turno_id', tid).eq('status', 'divergente'),
     ])
 
     const ha_realizado = prodData?.reduce((s, r) => s + (r.realizado_ha ?? 0), 0) ?? 0
     const ha_meta      = prodData?.reduce((s, r) => s + (r.meta_ha      ?? 0), 0) ?? 0
+    const avaliacao_media = avaliacoes?.length
+      ? Math.round((avaliacoes.reduce((s, r) => s + (r.nota_geral ?? 0), 0) / avaliacoes.length) * 10) / 10
+      : 0
 
     setData({
-      presentes:           presentes  ?? 0,
-      total_colaboradores: total      ?? 0,
-      maquinas:            maquinas   ?? 0,
+      presentes:            presentes  ?? 0,
+      total_colaboradores:  total      ?? 0,
+      maquinas:             maquinas   ?? 0,
       ha_realizado,
       ha_meta,
-      refeicoes:           refeicoes  ?? 0,
-      epis_pendentes:      epis       ?? 0,
-      solicitacoes:        solicitacoes ?? 0,
+      refeicoes:            refeicoes  ?? 0,
+      epis_pendentes:       epis       ?? 0,
+      solicitacoes:         solicitacoes ?? 0,
+      afericoes_reprovadas: afericoes_reprovadas ?? 0,
+      epis_vencendo:        epis_vencendo ?? 0,
+      avaliacao_media,
+      insumos_divergentes:  insumos_divergentes ?? 0,
     })
     setLoading(false)
   }
@@ -126,7 +145,7 @@ export default function RightDrawer({ visible, onClose, turnoAtivo }: Props) {
               <DrawerSection titulo="Operacional">
                 <DrawerRow
                   icon="people"
-                  label="Mão de Obra"
+                  label="Mao de Obra"
                   value={`${data?.presentes ?? 0}/${data?.total_colaboradores ?? 0}`}
                   sub="presentes"
                   color={
@@ -137,9 +156,9 @@ export default function RightDrawer({ visible, onClose, turnoAtivo }: Props) {
                 />
                 <DrawerRow
                   icon="construct"
-                  label="Máquinas"
+                  label="Maquinas"
                   value={String(data?.maquinas ?? 0)}
-                  sub="em operação"
+                  sub="em operacao"
                   color={C.drawerGreen}
                 />
                 <DrawerRow
@@ -149,29 +168,57 @@ export default function RightDrawer({ visible, onClose, turnoAtivo }: Props) {
                   sub={data?.ha_meta ? `${efic}% da meta (${data.ha_meta} ha)` : 'sem meta'}
                   color={eficCor}
                 />
+                <DrawerRow
+                  icon="beaker"
+                  label="Afericoes reprovadas"
+                  value={String(data?.afericoes_reprovadas ?? 0)}
+                  sub="requer ajuste"
+                  color={data?.afericoes_reprovadas ? C.drawerRed : C.drawerGreen}
+                />
+                <DrawerRow
+                  icon="star"
+                  label="Avaliacao equipe"
+                  value={data?.avaliacao_media ? String(data.avaliacao_media) : '-'}
+                  sub="nota media"
+                  color={data?.avaliacao_media >= 4 ? C.drawerGreen : data?.avaliacao_media >= 3 ? C.drawerYellow : C.drawerRed}
+                />
               </DrawerSection>
 
-              <DrawerSection titulo="Solicitações">
+              <DrawerSection titulo="Solicitacoes">
                 <DrawerRow
                   icon="restaurant"
-                  label="Refeições"
+                  label="Refeicoes"
                   value={String(data?.refeicoes ?? 0)}
                   sub="solicitadas"
                   color={C.drawerGreen}
                 />
                 <DrawerRow
                   icon="shield-checkmark"
-                  label="EPIs"
+                  label="EPIs pendentes"
                   value={String(data?.epis_pendentes ?? 0)}
-                  sub="pendentes"
+                  sub="aguardando aprovacao"
                   color={data?.epis_pendentes ? C.drawerYellow : C.drawerGreen}
                 />
                 <DrawerRow
+                  icon="warning"
+                  label="EPIs vencendo"
+                  value={String(data?.epis_vencendo ?? 0)}
+                  sub="vencidos ou vencendo"
+                  color={data?.epis_vencendo ? C.drawerRed : C.drawerGreen}
+                />
+                <DrawerRow
                   icon="cube"
-                  label="Insumos"
+                  label="Insumos pendentes"
                   value={String(data?.solicitacoes ?? 0)}
-                  sub="pendentes"
+                  sub="aguardando aprovacao"
                   color={data?.solicitacoes ? C.drawerYellow : C.drawerGreen}
+                />
+                <DrawerRow
+                  icon="alert-circle"
+                  label="Insumos divergentes"
+                  value={String(data?.insumos_divergentes ?? 0)}
+                  sub="requer verificacao"
+                  color={data?.insumos_divergentes ? C.drawerRed : C.drawerGreen}
                 />
               </DrawerSection>
 

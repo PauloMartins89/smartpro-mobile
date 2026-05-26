@@ -4,8 +4,8 @@ const path = require('path');
 const monorepoRoot = path.resolve(__dirname, '../..');
 const config = getDefaultConfig(__dirname);
 
-// Monorepo: watch root node_modules + app node_modules
-config.watchFolders = [monorepoRoot];
+// Monorepo: watch only root node_modules (not entire monorepo to avoid ENOENT in other apps)
+config.watchFolders = [path.resolve(monorepoRoot, 'node_modules')];
 config.resolver.nodeModulesPaths = [
   path.resolve(__dirname, 'node_modules'),
   path.resolve(monorepoRoot, 'node_modules'),

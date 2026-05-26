@@ -17,10 +17,10 @@ function uuidv4() {
   })
 }
 
-const STATUS_OPTS = ['pendente','aprovado','reprovado','entregue']
-const MOTIVO_OPTS = ['Primeiro fornecimento','Reposicao','Substituicao por dano','EPI vencido','Perda']
+const STATUS_OPTS = ['entregue','pendente','vencendo','vencido']
+const MOTIVO_OPTS = ['Primeiro fornecimento','Reposicao','Substituicao por dano','EPI vencido']
 
-export default function SolicitacaoEpiScreen() {
+export default function ControleEpiScreen() {
   const nav         = useNavigation()
   const turnoAtivo  = useLiderStore(s => s.turnoAtivo)
   const workspaceId = useLiderStore(s => s.workspaceId)
@@ -35,19 +35,20 @@ export default function SolicitacaoEpiScreen() {
   const [saving,   setSaving]   = useState(false)
   const [colab,    setColab]    = useState(null)
   const [epi,      setEpi]      = useState(null)
-  const [qtd,      setQtd]      = useState('1')
   const [motivo,   setMotivo]   = useState(MOTIVO_OPTS[0])
+  const [validade, setValidade] = useState('')
+  const [status,   setStatus]   = useState('entregue')
   const [fotoUri,  setFotoUri]  = useState(null)
   const [obs,      setObs]      = useState('')
 
-  useEffect(() => { nav.setOptions({ title: 'Solicitacao de EPI' }) }, [])
+  useEffect(() => { nav.setOptions({ title: 'Controle de EPI' }) }, [])
 
   const carregar = useCallback(async () => {
     if (!turnoAtivo) return
     setLoading(true)
     const { data } = await supabase
-      .from('lider_solicitacoes_epi')
-      .select('id, quantidade, motivo, status, created_at, lider_colaboradores(nome), lider_epis(nome, categoria)')
+      .from('lider_controle_epi')
+      .select('id, status, motivo, validade, foto_url, created_at, lider_colaboradores(nome), lider_epis(nome)')
       .eq('turno_id', turnoAtivo.id)
       .order('created_at', { ascending: false })
     setRecords(data ?? [])
@@ -55,16 +56,17 @@ export default function SolicitacaoEpiScreen() {
   }, [turnoAtivo?.id])
 
   useEffect(() => {
-    supabase.from('lider_colaboradores').select('id, nome, funcao').eq('equipe_id', turnoAtivo?.equipe_id ?? '').eq('ativo', true).order('nome')
+    supabase.from('lider_colaboradores').select('id, nome, cargo').eq('equipe_id', turnoAtivo?.equipe_id ?? '').eq('ativo', true).order('nome')
       .then(({ data }) => setColabs(data ?? []))
-    supabase.from('lider_epis').select('id, nome, categoria, ca').eq('workspace_id', workspaceId).eq('ativo', true).order('nome')
+    supabase.from('lider_epis').select('id, nome, ca').eq('workspace_id', workspaceId).eq('ativo', true).order('nome')
       .then(({ data }) => setEpis(data ?? []))
     carregar()
   }, [carregar])
 
-  const pendentes  = records.filter(r => r.status === 'pendente').length
-  const aprovadas  = records.filter(r => r.status === 'aprovado').length
-  const offline    = queue.filter(r => r.table === 'lider_solicitacoes_epi').length
+  const entregues  = records.filter(r => r.status === 'entregue').length
+  const vencendo   = records.filter(r => r.status === 'vencendo').length
+  const vencidos   = records.filter(r => r.status === 'vencido').length
+  const pendentes  = queue.filter(r => r.table === 'lider_controle_epi').length
 
   async function pickFoto() {
     const { status: perm } = await ImagePicker.requestCameraPermissionsAsync()
@@ -85,28 +87,26 @@ export default function SolicitacaoEpiScreen() {
       const fileName = uuidv4() + '.' + ext
       const resp = await fetch(fotoUri)
       const blob = await resp.blob()
-      const { data: up } = await supabase.storage.from('lider-fotos').upload('epi-sol/' + fileName, blob, { contentType: 'image/' + ext })
+      const { data: up } = await supabase.storage.from('lider-fotos').upload('epi/' + fileName, blob, { contentType: 'image/' + ext })
       if (up) {
-        const { data: urlData } = supabase.storage.from('lider-fotos').getPublicUrl('epi-sol/' + fileName)
+        const { data: urlData } = supabase.storage.from('lider-fotos').getPublicUrl('epi/' + fileName)
         foto_url = urlData.publicUrl
       }
     }
     const id = uuidv4()
     const payload = {
       id, turno_id: turnoAtivo.id, workspace_id: workspaceId,
-      colaborador_id: colab.id, colaborador_nome: colab.nome,
-      epi_id: epi.id, epi_nome: epi.nome,
-      quantidade: parseInt(qtd) || 1, motivo, foto_url,
-      status: 'pendente', observacao: obs, solicitado_por: user.user?.id,
+      colaborador_id: colab.id, epi_id: epi.id, motivo, validade: validade || null,
+      status, foto_url, observacao: obs, criado_por: user.user?.id,
     }
-    const { error } = await supabase.from('lider_solicitacoes_epi').insert(payload)
+    const { error } = await supabase.from('lider_controle_epi').insert(payload)
     if (error) {
-      addToQueue({ id, table: 'lider_solicitacoes_epi', action: 'insert', payload, created_at: new Date().toISOString() })
-      setRecords(prev => [{ id, lider_colaboradores: { nome: colab.nome }, lider_epis: { nome: epi.nome }, quantidade: parseInt(qtd), motivo, status: 'pendente', created_at: new Date().toISOString(), sync_status: 'pending' }, ...prev])
+      addToQueue({ id, table: 'lider_controle_epi', action: 'insert', payload, created_at: new Date().toISOString() })
+      setRecords(prev => [{ id, lider_colaboradores: { nome: colab.nome }, lider_epis: { nome: epi.nome }, status, motivo, created_at: new Date().toISOString(), sync_status: 'pending' }, ...prev])
       Alert.alert('Salvo offline', 'Sera sincronizado quando a conexao voltar.')
     } else await carregar()
     setSaving(false); setShowForm(false)
-    setColab(null); setEpi(null); setQtd('1'); setMotivo(MOTIVO_OPTS[0]); setFotoUri(null); setObs('')
+    setColab(null); setEpi(null); setMotivo(MOTIVO_OPTS[0]); setValidade(''); setFotoUri(null); setObs(''); setStatus('entregue')
   }
 
   return (
@@ -114,32 +114,32 @@ export default function SolicitacaoEpiScreen() {
       <SyncBanner />
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 14 }}>
-        <StatCard label="Pendentes" value={pendentes}  icon="time-outline"             color={C.yellow}  bg={C.yellowBg} />
-        <StatCard label="Aprovadas" value={aprovadas}  icon="checkmark-circle-outline" color={C.primary} bg={C.greenBg}  />
-        <StatCard label="Total"     value={records.length} icon="shield-outline"       color={C.blue}    bg={C.blueBg}   />
-        <StatCard label="Offline"   value={offline}    icon="cloud-offline-outline"    color={C.red}     bg={C.redBg}    />
+        <StatCard label="Entregues"  value={entregues}  icon="shield-checkmark-outline" color={C.primary} bg={C.greenBg}  />
+        <StatCard label="Vencendo"   value={vencendo}   icon="warning-outline"          color={C.yellow}  bg={C.yellowBg} />
+        <StatCard label="Vencidos"   value={vencidos}   icon="close-circle-outline"     color={C.red}     bg={C.redBg}    />
+        <StatCard label="Offline"    value={pendentes}  icon="cloud-offline-outline"    color={C.blue}    bg={C.blueBg}   />
       </ScrollView>
 
       <View style={s.actionRow}>
-        <Text style={s.sectionTitle}>Solicitacoes do turno</Text>
+        <Text style={s.sectionTitle}>Controle do turno</Text>
         <TouchableOpacity style={s.newBtn} onPress={() => setShowForm(true)}>
           <Ionicons name="add" size={16} color="#fff" />
-          <Text style={s.newBtnText}>Nova</Text>
+          <Text style={s.newBtnText}>Novo</Text>
         </TouchableOpacity>
       </View>
 
       {loading ? <ActivityIndicator color={C.primary} style={{ marginTop: 40 }} /> : (
         <FlatList data={records} keyExtractor={r => r.id}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
-          ListEmptyComponent={<EmptyList icon="shield-outline" msg="Nenhuma solicitacao de EPI neste turno" />}
+          ListEmptyComponent={<EmptyList icon="shield-checkmark-outline" msg="Nenhum EPI registrado neste turno" />}
           renderItem={({ item }) => (
             <View style={s.row}>
-              <View style={[s.iconDot, { backgroundColor: C.greenBg }]}>
-                <Ionicons name="shield-outline" size={16} color={C.primary} />
+              <View style={[s.iconDot, { backgroundColor: item.status === 'entregue' ? C.greenBg : item.status === 'vencido' ? C.redBg : C.yellowBg }]}>
+                <Ionicons name="shield-checkmark-outline" size={16} color={item.status === 'entregue' ? C.green : item.status === 'vencido' ? C.red : C.yellow} />
               </View>
               <View style={{ flex: 1, marginLeft: 10 }}>
                 <Text style={s.rowTitle}>{item.lider_colaboradores?.nome ?? '?'}</Text>
-                <Text style={s.rowSub}>{item.lider_epis?.nome ?? '?'} · qtd {item.quantidade}</Text>
+                <Text style={s.rowSub}>{item.lider_epis?.nome ?? '?'} · {item.motivo}</Text>
               </View>
               <StatusChip status={item.status ?? 'pendente'} size="sm" />
             </View>
@@ -151,7 +151,7 @@ export default function SolicitacaoEpiScreen() {
         <View style={s.overlay}>
           <View style={s.modal}>
             <View style={s.modalHdr}>
-              <Text style={s.modalTitle}>Solicitar EPI</Text>
+              <Text style={s.modalTitle}>Registro de EPI</Text>
               <TouchableOpacity onPress={() => setShowForm(false)}>
                 <Ionicons name="close" size={22} color={C.textSub} />
               </TouchableOpacity>
@@ -175,9 +175,6 @@ export default function SolicitacaoEpiScreen() {
                   ))}
                 </ScrollView>
               </Section>
-              <Section label="Quantidade">
-                <TextInput style={s.input} value={qtd} onChangeText={setQtd} keyboardType="number-pad" placeholder="1" placeholderTextColor={C.textMuted} />
-              </Section>
               <Section label="Motivo">
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                   {MOTIVO_OPTS.map(m => (
@@ -187,7 +184,19 @@ export default function SolicitacaoEpiScreen() {
                   ))}
                 </View>
               </Section>
-              <Section label="Foto do EPI danificado (opcional)">
+              <Section label="Validade do EPI">
+                <TextInput style={s.input} value={validade} onChangeText={setValidade} placeholder="DD/MM/AAAA" placeholderTextColor={C.textMuted} />
+              </Section>
+              <Section label="Status">
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {STATUS_OPTS.map(st => (
+                    <TouchableOpacity key={st} style={[s.chip, status === st && s.chipOn]} onPress={() => setStatus(st)}>
+                      <Text style={[s.chipTx, status === st && s.chipTxOn]}>{st}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </Section>
+              <Section label="Foto (opcional)">
                 <TouchableOpacity style={[s.input, { alignItems: 'center', justifyContent: 'center', height: 50 }]} onPress={pickFoto}>
                   <Text style={{ color: C.primary, fontWeight: '600' }}>{fotoUri ? 'Foto selecionada - trocar' : 'Tirar foto'}</Text>
                 </TouchableOpacity>
@@ -197,7 +206,7 @@ export default function SolicitacaoEpiScreen() {
                 <TextInput style={[s.input, { height: 70, textAlignVertical: 'top' }]} value={obs} onChangeText={setObs} multiline placeholder="Obs..." placeholderTextColor={C.textMuted} />
               </Section>
               <TouchableOpacity style={s.saveBtn} onPress={handleSalvar} disabled={saving}>
-                {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.saveTx}>Enviar Solicitacao</Text>}
+                {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.saveTx}>Salvar Registro EPI</Text>}
               </TouchableOpacity>
             </ScrollView>
           </View>

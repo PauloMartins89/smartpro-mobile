@@ -32,6 +32,12 @@ export const C = {
   blue:       '#3B82F6',
   blueBg:     '#DBEAFE',
   blueText:   '#1D4ED8',
+  purple:     '#8B5CF6',
+  purpleBg:   '#EDE9FE',
+  purpleText: '#5B21B6',
+  orange:     '#F97316',
+  orangeBg:   '#FFEDD5',
+  orangeText: '#C2410C',
 
   // Drawer (painel lateral)
   drawerBg:      '#0D1117',

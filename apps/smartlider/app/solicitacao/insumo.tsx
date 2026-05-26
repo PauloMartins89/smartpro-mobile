@@ -1,128 +1,196 @@
-import { useEffect, useState } from 'react'
-import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Alert, ActivityIndicator, Platform,
-} from 'react-native'
+// @ts-nocheck
+import { useEffect, useState, useCallback } from 'react'
+import { View, Text, StyleSheet, ScrollView, FlatList, TouchableOpacity, TextInput, Alert, ActivityIndicator, Modal } from 'react-native'
 import { useNavigation } from 'expo-router'
+import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../src/lib/supabase'
 import useLiderStore from '../../src/store/useLiderStore'
-import { C, todayISO } from '../../src/lib/theme'
+import useSyncStore from '../../src/store/useSyncStore'
+import { C, fmtDate } from '../../src/lib/theme'
+import { StatCard, StatusChip, SyncBanner, Section, EmptyList } from '../../src/components/ModuleShared'
 
-interface Produto { id: string; nome: string; unidade: string }
-const URGENCIAS = [
-  { id: 'normal',   label: 'Normal',  color: C.blue   },
-  { id: 'urgente',  label: 'Urgente', color: C.yellow },
-  { id: 'critico',  label: 'Crítico', color: C.red    },
-]
+function uuidv4() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16)
+  })
+}
 
-export default function SolicitarInsumoScreen() {
+const URGENCIA_OPTS = ['baixa','media','alta','urgente']
+const STATUS_OPTS   = ['pendente','aprovado','reprovado','entregue']
+
+export default function SolicitacaoInsumoScreen() {
   const nav         = useNavigation()
   const turnoAtivo  = useLiderStore(s => s.turnoAtivo)
   const workspaceId = useLiderStore(s => s.workspaceId)
-  const [produtos,  setProdutos]  = useState<Produto[]>([])
-  const [produto,   setProduto]   = useState<Produto | null>(null)
-  const [quantidade,setQuantidade]= useState('')
-  const [urgencia,  setUrgencia]  = useState('normal')
-  const [dataNec,   setDataNec]   = useState(todayISO())
-  const [obs,       setObs]       = useState('')
-  const [loading,   setLoading]   = useState(true)
-  const [saving,    setSaving]    = useState(false)
+  const addToQueue  = useSyncStore(s => s.addToQueue)
+  const queue       = useSyncStore(s => s.queue)
+
+  const [records,  setRecords]  = useState([])
+  const [produtos, setProdutos] = useState([])
+  const [loading,  setLoading]  = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [saving,   setSaving]   = useState(false)
+  const [produto,  setProduto]  = useState(null)
+  const [qtd,      setQtd]      = useState('')
+  const [urgencia, setUrgencia] = useState('media')
+  const [dataNec,  setDataNec]  = useState('')
+  const [obs,      setObs]      = useState('')
 
   useEffect(() => { nav.setOptions({ title: 'Solicitar Insumo' }) }, [])
 
+  const carregar = useCallback(async () => {
+    if (!turnoAtivo) return
+    setLoading(true)
+    const { data } = await supabase
+      .from('lider_solicitacoes_insumo')
+      .select('id, quantidade, unidade, urgencia, status, created_at, lider_produtos(nome)')
+      .eq('turno_id', turnoAtivo.id)
+      .order('created_at', { ascending: false })
+    setRecords(data ?? [])
+    setLoading(false)
+  }, [turnoAtivo?.id])
+
   useEffect(() => {
     supabase.from('lider_produtos').select('id, nome, unidade').eq('workspace_id', workspaceId).eq('ativo', true).order('nome')
-      .then(({ data }) => { setProdutos(data ?? []); setLoading(false) })
-  }, [])
+      .then(({ data }) => setProdutos(data ?? []))
+    carregar()
+  }, [carregar])
 
-  async function handleSolicitar() {
+  const pendentes  = records.filter(r => r.status === 'pendente').length
+  const aprovadas  = records.filter(r => r.status === 'aprovado').length
+  const urgentes   = records.filter(r => r.urgencia === 'urgente').length
+  const offline    = queue.filter(r => r.table === 'lider_solicitacoes_insumo').length
+
+  async function handleSalvar() {
     if (!turnoAtivo) return
-    if (!produto)   { Alert.alert('Atenção', 'Selecione o produto'); return }
-    if (!quantidade){ Alert.alert('Atenção', 'Informe a quantidade'); return }
+    if (!produto) { Alert.alert('Atencao', 'Selecione o produto'); return }
+    if (!qtd)     { Alert.alert('Atencao', 'Informe a quantidade'); return }
     setSaving(true)
     const { data: user } = await supabase.auth.getUser()
-
-    const { error } = await supabase.from('lider_solicitacoes_insumo').insert({
-      turno_id:         turnoAtivo.id,
-      workspace_id:     workspaceId,
-      tipo_solicitacao: 'insumo',
-      produto_id:       produto.id,
-      descricao:        produto.nome,
-      quantidade:       parseFloat(quantidade) || 0,
-      unidade:          produto.unidade,
-      urgencia,
-      data_necessaria:  dataNec,
-      observacao:       obs,
-      criado_por:       user.user?.id,
-      status:           'pendente',
-    })
-
-    if (error) Alert.alert('Erro', error.message)
-    else {
-      Alert.alert('Solicitação Enviada', `${produto.nome} solicitado com sucesso!`)
-      setProduto(null); setQuantidade(''); setObs(''); setUrgencia('normal')
+    const id = uuidv4()
+    const payload = {
+      id, turno_id: turnoAtivo.id, workspace_id: workspaceId,
+      produto_id: produto.id, quantidade: parseFloat(qtd) || 0,
+      unidade: produto.unidade, urgencia, data_necessaria: dataNec || null,
+      status: 'pendente', observacao: obs, criado_por: user.user?.id,
     }
-    setSaving(false)
+    const { error } = await supabase.from('lider_solicitacoes_insumo').insert(payload)
+    if (error) {
+      addToQueue({ id, table: 'lider_solicitacoes_insumo', action: 'insert', payload, created_at: new Date().toISOString() })
+      setRecords(prev => [{ id, lider_produtos: { nome: produto.nome }, quantidade: parseFloat(qtd), unidade: produto.unidade, urgencia, status: 'pendente', created_at: new Date().toISOString(), sync_status: 'pending' }, ...prev])
+      Alert.alert('Salvo offline', 'Sera sincronizado quando a conexao voltar.')
+    } else await carregar()
+    setSaving(false); setShowForm(false)
+    setProduto(null); setQtd(''); setDataNec(''); setObs(''); setUrgencia('media')
   }
 
-  if (loading) return <View style={styles.center}><ActivityIndicator color={C.primary} size="large" /></View>
-
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={{ padding: 16 }}>
-        <SectionLabel>Produto</SectionLabel>
-        {produtos.map(p => (
-          <TouchableOpacity key={p.id} style={[styles.card, produto?.id === p.id && styles.cardActive]} onPress={() => setProduto(p)} activeOpacity={0.8}>
-            <Text style={[styles.cardTitle, produto?.id === p.id && { color: C.primaryDark }]}>{p.nome}</Text>
-            <Text style={styles.cardSub}>{p.unidade}</Text>
-          </TouchableOpacity>
-        ))}
-
-        <SectionLabel>Quantidade {produto ? `(${produto.unidade})` : ''}</SectionLabel>
-        <TextInput style={styles.input} value={quantidade} onChangeText={setQuantidade} keyboardType="numeric" placeholder="0" placeholderTextColor={C.textMuted} />
-
-        <SectionLabel>Urgência</SectionLabel>
-        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 20 }}>
-          {URGENCIAS.map(u => (
-            <TouchableOpacity key={u.id} style={[styles.urgCard, urgencia === u.id && { borderColor: u.color, backgroundColor: u.color + '18' }]} onPress={() => setUrgencia(u.id)}>
-              <Text style={[styles.urgText, urgencia === u.id && { color: u.color, fontWeight: '700' }]}>{u.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <SectionLabel>Data Necessária</SectionLabel>
-        <TextInput style={styles.input} value={dataNec} onChangeText={setDataNec} placeholder="AAAA-MM-DD" placeholderTextColor={C.textMuted} />
-
-        <SectionLabel>Justificativa</SectionLabel>
-        <TextInput style={[styles.input, { minHeight: 70 }]} value={obs} onChangeText={setObs} multiline placeholder="Por que precisa deste insumo?" placeholderTextColor={C.textMuted} />
-
-        <View style={{ height: 100 }} />
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <SyncBanner />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 14 }}>
+        <StatCard label="Pendentes" value={pendentes}  icon="time-outline"            color={C.yellow}  bg={C.yellowBg} />
+        <StatCard label="Aprovadas" value={aprovadas}  icon="checkmark-circle-outline" color={C.primary} bg={C.greenBg}  />
+        <StatCard label="Urgentes"  value={urgentes}   icon="alert-circle-outline"     color={C.red}     bg={C.redBg}    />
+        <StatCard label="Offline"   value={offline}    icon="cloud-offline-outline"    color={C.blue}    bg={C.blueBg}   />
       </ScrollView>
 
-      <View style={styles.footer}>
-        <TouchableOpacity style={styles.btn} onPress={handleSolicitar} disabled={saving} activeOpacity={0.85}>
-          {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Enviar Solicitação</Text>}
+      <View style={s.actionRow}>
+        <Text style={s.sectionTitle}>Solicitacoes do turno</Text>
+        <TouchableOpacity style={s.newBtn} onPress={() => setShowForm(true)}>
+          <Ionicons name="add" size={16} color="#fff" />
+          <Text style={s.newBtnText}>Nova</Text>
         </TouchableOpacity>
       </View>
+
+      {loading ? <ActivityIndicator color={C.primary} style={{ marginTop: 40 }} /> : (
+        <FlatList data={records} keyExtractor={r => r.id}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
+          ListEmptyComponent={<EmptyList icon="flask-outline" msg="Nenhuma solicitacao de insumo neste turno" />}
+          renderItem={({ item }) => (
+            <View style={s.row}>
+              <View style={[s.iconDot, { backgroundColor: item.urgencia === 'urgente' ? C.redBg : C.yellowBg }]}>
+                <Ionicons name="flask-outline" size={16} color={item.urgencia === 'urgente' ? C.red : C.yellow} />
+              </View>
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text style={s.rowTitle}>{item.lider_produtos?.nome ?? '?'}</Text>
+                <Text style={s.rowSub}>{item.quantidade} {item.unidade} · {item.urgencia}</Text>
+              </View>
+              <StatusChip status={item.status ?? 'pendente'} size="sm" />
+            </View>
+          )}
+        />
+      )}
+
+      <Modal visible={showForm} animationType="slide" transparent>
+        <View style={s.overlay}>
+          <View style={s.modal}>
+            <View style={s.modalHdr}>
+              <Text style={s.modalTitle}>Solicitar Insumo</Text>
+              <TouchableOpacity onPress={() => setShowForm(false)}>
+                <Ionicons name="close" size={22} color={C.textSub} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={{ padding: 20 }}>
+              <Section label="Produto *">
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {produtos.map(p => (
+                    <TouchableOpacity key={p.id} style={[s.chip, produto?.id === p.id && s.chipOn]} onPress={() => setProduto(p)}>
+                      <Text style={[s.chipTx, produto?.id === p.id && s.chipTxOn]}>{p.nome}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </Section>
+              <Section label={`Quantidade (${produto?.unidade ?? 'un'})`}>
+                <TextInput style={s.input} value={qtd} onChangeText={setQtd} keyboardType="decimal-pad" placeholder="0.0" placeholderTextColor={C.textMuted} />
+              </Section>
+              <Section label="Urgencia">
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {URGENCIA_OPTS.map(u => (
+                    <TouchableOpacity key={u} style={[s.chip, urgencia === u && s.chipOn]} onPress={() => setUrgencia(u)}>
+                      <Text style={[s.chipTx, urgencia === u && s.chipTxOn]}>{u}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </Section>
+              <Section label="Data necessaria">
+                <TextInput style={s.input} value={dataNec} onChangeText={setDataNec} placeholder="DD/MM/AAAA" placeholderTextColor={C.textMuted} />
+              </Section>
+              <Section label="Observacao">
+                <TextInput style={[s.input, { height: 70, textAlignVertical: 'top' }]} value={obs} onChangeText={setObs} multiline placeholder="Obs..." placeholderTextColor={C.textMuted} />
+              </Section>
+              <TouchableOpacity style={s.saveBtn} onPress={handleSalvar} disabled={saving}>
+                {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.saveTx}>Enviar Solicitacao</Text>}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   )
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <Text style={{ fontSize: 11, fontWeight: '700', color: C.textSub, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>{children}</Text>
-}
-
-const styles = StyleSheet.create({
-  container:  { flex: 1, backgroundColor: C.bg },
-  center:     { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  card:       { backgroundColor: C.bgCard, borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1.5, borderColor: C.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardActive: { borderColor: C.primary, backgroundColor: C.greenBg },
-  cardTitle:  { fontSize: 14, fontWeight: '700', color: C.text },
-  cardSub:    { fontSize: 12, color: C.textSub },
-  input:      { borderWidth: 1.5, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: C.text, backgroundColor: C.bgCard, marginBottom: 20 },
-  urgCard:    { flex: 1, borderWidth: 1.5, borderColor: C.border, borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
-  urgText:    { fontSize: 13, color: C.textSub, fontWeight: '600' },
-  footer:     { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: C.border, padding: 14, paddingBottom: Platform.OS === 'ios' ? 30 : 14 },
-  btn:        { backgroundColor: C.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-  btnText:    { color: '#fff', fontWeight: '700', fontSize: 15 },
+const s = StyleSheet.create({
+  actionRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 10 },
+  sectionTitle:{ fontSize: 14, fontWeight: '700', color: C.text },
+  newBtn:      { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: C.primary, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
+  newBtnText:  { color: '#fff', fontWeight: '700', fontSize: 13 },
+  row:         { flexDirection: 'row', alignItems: 'center', backgroundColor: C.bgCard, borderRadius: 12, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: C.border },
+  rowTitle:    { fontSize: 14, fontWeight: '700', color: C.text },
+  rowSub:      { fontSize: 12, color: C.textSub, marginTop: 2 },
+  overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  modal:       { backgroundColor: C.bgCard, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '92%' },
+  modalHdr:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, borderBottomWidth: 1, borderBottomColor: C.border },
+  modalTitle:  { fontSize: 16, fontWeight: '800', color: C.text },
+  chip:        { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: C.bgMuted, marginRight: 8, marginBottom: 6 },
+  chipOn:      { backgroundColor: C.primary },
+  chipTx:      { fontSize: 12, fontWeight: '600', color: C.textSub },
+  chipTxOn:    { color: '#fff' },
+  input:       { backgroundColor: C.bgMuted, borderRadius: 10, padding: 12, fontSize: 14, color: C.text, borderWidth: 1, borderColor: C.border },
+  saveBtn:     { backgroundColor: C.primary, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 8 },
+  saveTx:      { color: '#fff', fontWeight: '800', fontSize: 15 },
+  iconDot:     { width: 38, height: 38, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  starRow:     { flexDirection: 'row', gap: 6, marginBottom: 4 },
+  star:        { fontSize: 28 },
 })

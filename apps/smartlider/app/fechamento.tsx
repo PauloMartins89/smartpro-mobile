@@ -83,7 +83,15 @@ export default function FechamentoScreen() {
       <ScrollView contentContainerStyle={{ padding: 16 }}>
         {/* Cabeçalho do turno */}
         <View style={styles.headerCard}>
-          <Text style={styles.headerTitle}>Resumo do Turno</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+            <TouchableOpacity
+              onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')}
+              style={{ marginRight: 10 }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Ionicons name="chevron-back" size={24} color="#fff" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Resumo do Turno</Text>
+          </View>
           <Text style={styles.headerSub}>
             {turnoAtivo?.frente_nome} · {TURNO_LABEL[turnoAtivo?.turno ?? 'manha']}
           </Text>

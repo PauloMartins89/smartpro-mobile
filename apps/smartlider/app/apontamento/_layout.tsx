@@ -1,5 +1,19 @@
-import { Stack } from 'expo-router'
+import { Stack, useRouter } from 'expo-router'
+import { TouchableOpacity } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 import { C } from '../../src/lib/theme'
+
+function BackButton() {
+  const router = useRouter()
+  return (
+    <TouchableOpacity
+      onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')}
+      style={{ paddingHorizontal: 8, paddingVertical: 4 }}
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+      <Ionicons name="chevron-back" size={26} color="#fff" />
+    </TouchableOpacity>
+  )
+}
 
 export default function ApontamentoLayout() {
   return (
@@ -7,6 +21,7 @@ export default function ApontamentoLayout() {
       headerStyle:      { backgroundColor: C.navy },
       headerTintColor:  '#fff',
       headerTitleStyle: { fontWeight: '700' },
+      headerLeft:       () => <BackButton />,
     }} />
   )
 }

@@ -4,6 +4,7 @@ import {
   ActivityIndicator, Alert, Platform,
 } from 'react-native'
 import { useRouter } from 'expo-router'
+import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../src/lib/supabase'
 import useLiderStore, { type Turno } from '../../src/store/useLiderStore'
 import { C, TURNO_LABEL, todayISO, fmtDate } from '../../src/lib/theme'
@@ -24,40 +25,53 @@ export default function IniciarTurnoScreen() {
   const [loading,  setLoading]  = useState(false)
   const [fetching, setFetching] = useState(true)
 
-  // Carrega frentes (auto-detecta workspace se necessário)
+  // Carrega frentes — sempre via auth + lider_equipes (garante workspace correto)
   useEffect(() => {
     let cancelled = false
     async function carregarFrentes() {
-      let wsId = workspaceId
+      // 1) Obtém usuário autenticado
+      const { data: authData } = await supabase.auth.getUser()
+      const uid   = authData.user?.id
+      const email = authData.user?.email
+      if (!uid) { if (!cancelled) setFetching(false); return }
 
-      // Se workspaceId não está no store, busca via equipe vinculada ao líder
-      if (!wsId) {
-        const { data: authData } = await supabase.auth.getUser()
-        const uid = authData.user?.id
-        if (uid) {
-          const { data: eq } = await supabase
-            .from('lider_equipes')
-            .select('workspace_id')
-            .eq('lider_id', uid)
-            .limit(1)
-            .maybeSingle()
-          if (eq?.workspace_id) {
-            wsId = eq.workspace_id
-            if (!cancelled) setWorkspaceId(wsId)
-          }
-        }
+      // 2) Descobre workspace pelo lider_id ou lider_email
+      let wsId = ''
+      const { data: eqById } = await supabase
+        .from('lider_equipes')
+        .select('workspace_id')
+        .eq('lider_id', uid)
+        .limit(1)
+        .maybeSingle()
+      if (eqById?.workspace_id) {
+        wsId = eqById.workspace_id
+      } else if (email) {
+        // fallback: busca por email
+        const { data: eqByEmail } = await supabase
+          .from('lider_equipes')
+          .select('workspace_id')
+          .eq('lider_email', email)
+          .limit(1)
+          .maybeSingle()
+        if (eqByEmail?.workspace_id) wsId = eqByEmail.workspace_id
       }
 
-      if (!wsId) {
-        if (!cancelled) setFetching(false)
-        return
-      }
+      // 3) Fallback: usa workspaceId do store (já persistido de sessão anterior)
+      if (!wsId && workspaceId) wsId = workspaceId
 
-      const { data, error } = await supabase
-        .from('lider_frentes').select('id, codigo, nome')
-        .eq('workspace_id', wsId).eq('ativo', true).order('codigo')
+      if (!wsId) { if (!cancelled) setFetching(false); return }
+
+      if (!cancelled) setWorkspaceId(wsId)
+
+      // 4) Carrega frentes do workspace
+      const { data: frs, error } = await supabase
+        .from('lider_frentes')
+        .select('id, codigo, nome')
+        .eq('workspace_id', wsId)
+        .eq('ativo', true)
+        .order('codigo')
       if (!cancelled) {
-        if (!error && data) setFrentes(data)
+        if (!error && frs) setFrentes(frs)
         setFetching(false)
       }
     }
@@ -147,8 +161,18 @@ export default function IniciarTurnoScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Iniciar Turno</Text>
-        <Text style={styles.headerSub}>{fmtDate(data)}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity
+            onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')}
+            style={{ marginRight: 12 }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="chevron-back" size={26} color="#fff" />
+          </TouchableOpacity>
+          <View>
+            <Text style={styles.headerTitle}>Iniciar Turno</Text>
+            <Text style={styles.headerSub}>{fmtDate(data)}</Text>
+          </View>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>

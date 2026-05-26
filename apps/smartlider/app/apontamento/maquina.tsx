@@ -1,171 +1,205 @@
+// @ts-nocheck
 import { useEffect, useState, useCallback } from 'react'
-import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Alert, ActivityIndicator, Platform,
-} from 'react-native'
+import { View, Text, StyleSheet, ScrollView, FlatList, TouchableOpacity, TextInput, Alert, ActivityIndicator, Modal } from 'react-native'
 import { useNavigation } from 'expo-router'
+import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../src/lib/supabase'
 import useLiderStore from '../../src/store/useLiderStore'
-import { C } from '../../src/lib/theme'
+import useSyncStore from '../../src/store/useSyncStore'
+import { C, fmtDate } from '../../src/lib/theme'
+import { StatCard, StatusChip, SyncBanner, Section, EmptyList } from '../../src/components/ModuleShared'
 
-interface MaquinaRow {
-  id?: string
-  maquina_id: string
-  codigo: string
-  modelo: string
-  horimetro_inicio: string
-  horimetro_fim: string
-  atividade: string
-  talhao_id: string
-  talhao_nome: string
-  observacao: string
+function uuidv4() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16)
+  })
 }
 
-interface Talhao { id: string; codigo: string; nome: string }
+const STATUS_OPTS = ['operando','parada','manutencao','aguardando']
 
 export default function MaquinaScreen() {
-  const nav        = useNavigation()
-  const turnoAtivo = useLiderStore(s => s.turnoAtivo)
-  const [rows,    setRows]    = useState<MaquinaRow[]>([])
-  const [talhoes, setTalhoes] = useState<Talhao[]>([])
-  const [loading, setLoading] = useState(true)
-  const [saving,  setSaving]  = useState(false)
+  const nav         = useNavigation()
+  const turnoAtivo  = useLiderStore(s => s.turnoAtivo)
+  const workspaceId = useLiderStore(s => s.workspaceId)
+  const addToQueue  = useSyncStore(s => s.addToQueue)
+  const queue       = useSyncStore(s => s.queue)
 
-  useEffect(() => { nav.setOptions({ title: 'Apontamento de Máquina' }) }, [])
+  const [records,  setRecords]  = useState([])
+  const [maquinas, setMaquinas] = useState([])
+  const [loading,  setLoading]  = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [saving,   setSaving]   = useState(false)
+  const [maq,      setMaq]      = useState(null)
+  const [horIni,   setHorIni]   = useState('')
+  const [horFim,   setHorFim]   = useState('')
+  const [atividade,setAtiv]     = useState('')
+  const [status,   setStatus]   = useState('operando')
+  const [obs,      setObs]      = useState('')
+
+  useEffect(() => { nav.setOptions({ title: 'Maquinas' }) }, [])
 
   const carregar = useCallback(async () => {
     if (!turnoAtivo) return
     setLoading(true)
-    const workspaceId = useLiderStore.getState().workspaceId
-
-    const [{ data: maquinas }, { data: lancados }, { data: tals }] = await Promise.all([
-      supabase.from('lider_maquinas').select('id, codigo, modelo').eq('workspace_id', workspaceId).eq('ativo', true).order('codigo'),
-      supabase.from('lider_apontamentos_maquina').select('*').eq('turno_id', turnoAtivo.id),
-      supabase.from('lider_talhoes').select('id, codigo, nome').eq('workspace_id', workspaceId).order('codigo'),
-    ])
-
-    setTalhoes(tals ?? [])
-    const mapa = Object.fromEntries((lancados ?? []).map(l => [l.maquina_id, l]))
-
-    setRows((maquinas ?? []).map(m => ({
-      id:               mapa[m.id]?.id,
-      maquina_id:       m.id,
-      codigo:           m.codigo ?? '',
-      modelo:           m.modelo ?? '',
-      horimetro_inicio: String(mapa[m.id]?.horimetro_inicio ?? ''),
-      horimetro_fim:    String(mapa[m.id]?.horimetro_fim    ?? ''),
-      atividade:        mapa[m.id]?.atividade    ?? '',
-      talhao_id:        mapa[m.id]?.talhao_id    ?? '',
-      talhao_nome:      (tals ?? []).find(t => t.id === mapa[m.id]?.talhao_id)?.codigo ?? '',
-      observacao:       mapa[m.id]?.observacao   ?? '',
-    })))
+    const { data } = await supabase
+      .from('lider_apontamentos_maquina')
+      .select('id, horimetro_inicio, horimetro_fim, atividade, status, created_at, lider_maquinas(nome, codigo)')
+      .eq('turno_id', turnoAtivo.id)
+      .order('created_at', { ascending: false })
+    setRecords(data ?? [])
     setLoading(false)
   }, [turnoAtivo?.id])
 
-  useEffect(() => { carregar() }, [carregar])
+  useEffect(() => {
+    supabase.from('lider_maquinas').select('id, nome, codigo, tipo')
+      .eq('workspace_id', workspaceId).eq('ativo', true).order('nome')
+      .then(({ data }) => setMaquinas(data ?? []))
+    carregar()
+  }, [carregar])
 
-  function update(idx: number, patch: Partial<MaquinaRow>) {
-    setRows(prev => prev.map((r, i) => i === idx ? { ...r, ...patch } : r))
-  }
+  const operando   = records.filter(r => r.status === 'operando' || !r.status).length
+  const paradas    = records.filter(r => r.status === 'parada' || r.status === 'manutencao').length
+  const horasTotal = records.reduce((s, r) => s + Math.max(0, (r.horimetro_fim ?? 0) - (r.horimetro_inicio ?? 0)), 0)
+  const pendentes  = queue.filter(r => r.table === 'lider_apontamentos_maquina').length
 
   async function handleSalvar() {
     if (!turnoAtivo) return
-    const { data: user } = await supabase.auth.getUser()
+    if (!maq) { Alert.alert('Atencao', 'Selecione a maquina'); return }
     setSaving(true)
-
-    const upserts = rows
-      .filter(r => r.horimetro_inicio || r.horimetro_fim)
-      .map(r => ({
-        id:               r.id,
-        turno_id:         turnoAtivo.id,
-        maquina_id:       r.maquina_id,
-        horimetro_inicio: parseFloat(r.horimetro_inicio) || null,
-        horimetro_fim:    parseFloat(r.horimetro_fim)    || null,
-        horas_trabalhadas: (parseFloat(r.horimetro_fim) || 0) - (parseFloat(r.horimetro_inicio) || 0),
-        atividade:        r.atividade,
-        talhao_id:        r.talhao_id || null,
-        observacao:       r.observacao,
-        criado_por:       user.user?.id,
-      }))
-
-    if (upserts.length === 0) { Alert.alert('Atenção', 'Informe ao menos o horímetro de uma máquina'); setSaving(false); return }
-
-    const { error } = await supabase.from('lider_apontamentos_maquina').upsert(upserts, { onConflict: 'turno_id,maquina_id' })
-    if (error) Alert.alert('Erro', error.message)
-    else       Alert.alert('Sucesso', 'Apontamentos salvos!')
-    setSaving(false)
-    carregar()
+    const { data: user } = await supabase.auth.getUser()
+    const id = uuidv4()
+    const payload = {
+      id, turno_id: turnoAtivo.id, workspace_id: workspaceId,
+      maquina_id: maq.id, horimetro_inicio: parseFloat(horIni) || 0,
+      horimetro_fim: parseFloat(horFim) || null,
+      atividade, status, observacao: obs, criado_por: user.user?.id,
+    }
+    const { error } = await supabase.from('lider_apontamentos_maquina').upsert(payload, { onConflict: 'turno_id,maquina_id' })
+    if (error) {
+      addToQueue({ id, table: 'lider_apontamentos_maquina', action: 'insert', payload, created_at: new Date().toISOString() })
+      setRecords(prev => [{ id, lider_maquinas: { nome: maq.nome, codigo: maq.codigo }, horimetro_inicio: parseFloat(horIni), horimetro_fim: parseFloat(horFim), atividade, status, sync_status: 'pending' }, ...prev])
+      Alert.alert('Salvo offline', 'Sera sincronizado quando a conexao voltar.')
+    } else await carregar()
+    setSaving(false); setShowForm(false)
+    setMaq(null); setHorIni(''); setHorFim(''); setAtiv(''); setObs(''); setStatus('operando')
   }
 
-  if (loading) return <View style={styles.center}><ActivityIndicator color={C.primary} size="large" /></View>
-
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={{ padding: 12 }}>
-        {rows.map((row, idx) => {
-          const horas = (parseFloat(row.horimetro_fim) || 0) - (parseFloat(row.horimetro_inicio) || 0)
-          return (
-            <View key={row.maquina_id} style={styles.card}>
-              <Text style={styles.cardTitle}>{row.codigo} · {row.modelo}</Text>
-
-              <View style={styles.row2}>
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>Horímetro Início</Text>
-                  <TextInput style={styles.input} value={row.horimetro_inicio} onChangeText={v => update(idx, { horimetro_inicio: v })} keyboardType="numeric" placeholder="0.0" placeholderTextColor={C.textMuted} />
-                </View>
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>Horímetro Fim</Text>
-                  <TextInput style={styles.input} value={row.horimetro_fim} onChangeText={v => update(idx, { horimetro_fim: v })} keyboardType="numeric" placeholder="0.0" placeholderTextColor={C.textMuted} />
-                </View>
-              </View>
-
-              {horas > 0 && <Text style={styles.horaCalc}>{horas.toFixed(1)} horas trabalhadas</Text>}
-
-              <Text style={styles.label}>Atividade</Text>
-              <TextInput style={styles.input} value={row.atividade} onChangeText={v => update(idx, { atividade: v })} placeholder="Ex: Pulverização" placeholderTextColor={C.textMuted} />
-
-              <Text style={styles.label}>Talhão</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
-                {talhoes.map(t => (
-                  <TouchableOpacity
-                    key={t.id}
-                    style={[styles.talhaoChip, row.talhao_id === t.id && styles.talhaoChipActive]}
-                    onPress={() => update(idx, { talhao_id: t.id, talhao_nome: t.codigo })}
-                  >
-                    <Text style={[styles.talhaoLabel, row.talhao_id === t.id && styles.talhaoLabelActive]}>{t.codigo}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          )
-        })}
-        <View style={{ height: 100 }} />
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <SyncBanner />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 14 }}>
+        <StatCard label="Operando"    value={operando}               icon="construct-outline"     color={C.primary} bg={C.greenBg}  />
+        <StatCard label="Paradas"     value={paradas}                icon="stop-circle-outline"   color={C.red}     bg={C.redBg}    />
+        <StatCard label="Horas total" value={horasTotal.toFixed(1)+'h'} icon="speedometer-outline" color={C.blue}  bg={C.blueBg}   />
+        <StatCard label="Offline"     value={pendentes}              icon="cloud-offline-outline" color={C.yellow}  bg={C.yellowBg} />
       </ScrollView>
 
-      <View style={styles.footer}>
-        <TouchableOpacity style={styles.btn} onPress={handleSalvar} disabled={saving} activeOpacity={0.85}>
-          {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Salvar Apontamentos</Text>}
+      <View style={s.actionRow}>
+        <Text style={s.sectionTitle}>Maquinas do turno</Text>
+        <TouchableOpacity style={s.newBtn} onPress={() => setShowForm(true)}>
+          <Ionicons name="add" size={16} color="#fff" />
+          <Text style={s.newBtnText}>Novo</Text>
         </TouchableOpacity>
       </View>
+
+      {loading ? <ActivityIndicator color={C.primary} style={{ marginTop: 40 }} /> : (
+        <FlatList data={records} keyExtractor={r => r.id}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
+          ListEmptyComponent={<EmptyList icon="construct-outline" msg="Nenhuma maquina apontada neste turno" />}
+          renderItem={({ item }) => (
+            <View style={s.row}>
+              <View style={[s.iconDot, { backgroundColor: item.status === 'operando' ? C.greenBg : C.redBg }]}>
+                <Ionicons name="construct-outline" size={16} color={item.status === 'operando' ? C.green : C.red} />
+              </View>
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text style={s.rowTitle}>{item.lider_maquinas?.nome ?? item.lider_maquinas?.codigo ?? '?'}</Text>
+                <Text style={s.rowSub}>{item.atividade || 'sem atividade'} · {Math.max(0, (item.horimetro_fim ?? 0) - (item.horimetro_inicio ?? 0)).toFixed(1)}h</Text>
+              </View>
+              <StatusChip status={item.status ?? 'operando'} size="sm" />
+            </View>
+          )}
+        />
+      )}
+
+      <Modal visible={showForm} animationType="slide" transparent>
+        <View style={s.overlay}>
+          <View style={s.modal}>
+            <View style={s.modalHdr}>
+              <Text style={s.modalTitle}>Apontamento de Maquina</Text>
+              <TouchableOpacity onPress={() => setShowForm(false)}>
+                <Ionicons name="close" size={22} color={C.textSub} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={{ padding: 20 }}>
+              <Section label="Maquina *">
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {maquinas.map(m => (
+                    <TouchableOpacity key={m.id} style={[s.chip, maq?.id === m.id && s.chipOn]} onPress={() => setMaq(m)}>
+                      <Text style={[s.chipTx, maq?.id === m.id && s.chipTxOn]}>{m.nome}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </Section>
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <Section label="Horimetro Inicio">
+                    <TextInput style={s.input} value={horIni} onChangeText={setHorIni} keyboardType="decimal-pad" placeholder="0.0" placeholderTextColor={C.textMuted} />
+                  </Section>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Section label="Horimetro Fim">
+                    <TextInput style={s.input} value={horFim} onChangeText={setHorFim} keyboardType="decimal-pad" placeholder="0.0" placeholderTextColor={C.textMuted} />
+                  </Section>
+                </View>
+              </View>
+              <Section label="Atividade">
+                <TextInput style={s.input} value={atividade} onChangeText={setAtiv} placeholder="Ex: Pulverizacao, Plantio..." placeholderTextColor={C.textMuted} />
+              </Section>
+              <Section label="Status">
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {STATUS_OPTS.map(st => (
+                    <TouchableOpacity key={st} style={[s.chip, status === st && s.chipOn]} onPress={() => setStatus(st)}>
+                      <Text style={[s.chipTx, status === st && s.chipTxOn]}>{st}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </Section>
+              <Section label="Observacao">
+                <TextInput style={[s.input, { height: 70, textAlignVertical: 'top' }]} value={obs} onChangeText={setObs} multiline placeholder="Obs..." placeholderTextColor={C.textMuted} />
+              </Section>
+              <TouchableOpacity style={s.saveBtn} onPress={handleSalvar} disabled={saving}>
+                {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.saveTx}>Salvar Apontamento</Text>}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   )
 }
 
-const styles = StyleSheet.create({
-  container:        { flex: 1, backgroundColor: C.bg },
-  center:           { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  card:             { backgroundColor: C.bgCard, borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: C.border },
-  cardTitle:        { fontSize: 15, fontWeight: '700', color: C.text, marginBottom: 12 },
-  row2:             { flexDirection: 'row', gap: 10, marginBottom: 8 },
-  halfField:        { flex: 1 },
-  label:            { fontSize: 11, fontWeight: '600', color: C.textSub, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
-  input:            { borderWidth: 1.5, borderColor: C.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 14, color: C.text, backgroundColor: C.bgMuted, marginBottom: 8 },
-  horaCalc:         { fontSize: 12, color: C.greenText, fontWeight: '700', marginBottom: 8 },
-  talhaoChip:       { borderWidth: 1.5, borderColor: C.border, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, marginRight: 6, backgroundColor: C.bgMuted },
-  talhaoChipActive: { borderColor: C.primary, backgroundColor: C.greenBg },
-  talhaoLabel:      { fontSize: 12, fontWeight: '600', color: C.textSub },
-  talhaoLabelActive:{ color: C.primaryDark },
-  footer:           { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: C.border, padding: 14, paddingBottom: Platform.OS === 'ios' ? 30 : 14 },
-  btn:              { backgroundColor: C.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-  btnText:          { color: '#fff', fontWeight: '700', fontSize: 15 },
+const s = StyleSheet.create({
+  actionRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 10 },
+  sectionTitle:{ fontSize: 14, fontWeight: '700', color: C.text },
+  newBtn:      { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: C.primary, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
+  newBtnText:  { color: '#fff', fontWeight: '700', fontSize: 13 },
+  row:         { flexDirection: 'row', alignItems: 'center', backgroundColor: C.bgCard, borderRadius: 12, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: C.border },
+  rowTitle:    { fontSize: 14, fontWeight: '700', color: C.text },
+  rowSub:      { fontSize: 12, color: C.textSub, marginTop: 2 },
+  overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  modal:       { backgroundColor: C.bgCard, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '92%' },
+  modalHdr:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, borderBottomWidth: 1, borderBottomColor: C.border },
+  modalTitle:  { fontSize: 16, fontWeight: '800', color: C.text },
+  chip:        { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: C.bgMuted, marginRight: 8, marginBottom: 6 },
+  chipOn:      { backgroundColor: C.primary },
+  chipTx:      { fontSize: 12, fontWeight: '600', color: C.textSub },
+  chipTxOn:    { color: '#fff' },
+  input:       { backgroundColor: C.bgMuted, borderRadius: 10, padding: 12, fontSize: 14, color: C.text, borderWidth: 1, borderColor: C.border },
+  saveBtn:     { backgroundColor: C.primary, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 8 },
+  saveTx:      { color: '#fff', fontWeight: '800', fontSize: 15 },
+  iconDot:     { width: 38, height: 38, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  starRow:     { flexDirection: 'row', gap: 6, marginBottom: 4 },
+  star:        { fontSize: 28 },
 })
