@@ -1,5 +1,5 @@
 import { Tabs, useRouter } from 'expo-router'
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, Platform, ActivityIndicator } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useEffect, useState } from 'react'
 import useLiderStore from '../../src/store/useLiderStore'
@@ -10,12 +10,23 @@ export default function TabsLayout() {
   const router              = useRouter()
   const turnoAtivo          = useLiderStore(s => s.turnoAtivo)
   const triggerDashRefresh  = useLiderStore(s => s.triggerDashRefresh)
+  const hasHydrated         = useLiderStore(s => s._hasHydrated)
   const [drawerOpen, setDrawerOpen] = useState(false)
 
-  // Se não há turno ativo → redireciona para seleção
+  // Aguarda hidratação do AsyncStorage antes de decidir rota
   useEffect(() => {
+    if (!hasHydrated) return
     if (!turnoAtivo) router.replace('/turno/novo')
-  }, [])
+  }, [hasHydrated])
+
+  // Ainda carregando store do AsyncStorage
+  if (!hasHydrated) {
+    return (
+      <View style={{ flex: 1, backgroundColor: C.navy, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={C.primary} />
+      </View>
+    )
+  }
 
   if (!turnoAtivo) return null
 

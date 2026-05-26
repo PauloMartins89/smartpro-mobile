@@ -37,10 +37,12 @@ interface LiderStore {
   workspaceId:   string
   dashRefreshKey: number
   turnoStats:    TurnoStats | null
+  _hasHydrated:  boolean
   setTurnoAtivo:      (turno: TurnoAtivo | null) => void
   setWorkspaceId:     (id: string) => void
   triggerDashRefresh: () => void
   setTurnoStats:      (stats: TurnoStats) => void
+  setHasHydrated:     (v: boolean) => void
 }
 
 const useLiderStore = create<LiderStore>()(
@@ -50,10 +52,12 @@ const useLiderStore = create<LiderStore>()(
       workspaceId: '',
       dashRefreshKey: 0,
       turnoStats:  null,
+      _hasHydrated: false,
       setTurnoAtivo:      turno => set({ turnoAtivo: turno }),
       setWorkspaceId:     id    => set({ workspaceId: id }),
       triggerDashRefresh: ()    => set(s => ({ dashRefreshKey: s.dashRefreshKey + 1 })),
       setTurnoStats:      stats => set({ turnoStats: stats }),
+      setHasHydrated:     v     => set({ _hasHydrated: v }),
     }),
     {
       name:    'smartlider-store',
@@ -63,6 +67,9 @@ const useLiderStore = create<LiderStore>()(
         workspaceId: state.workspaceId,
         turnoStats:  state.turnoStats,
       }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true)
+      },
     }
   )
 )
