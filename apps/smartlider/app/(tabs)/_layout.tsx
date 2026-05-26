@@ -16,7 +16,8 @@ export default function TabsLayout() {
   // Aguarda hidratação do AsyncStorage antes de decidir rota
   useEffect(() => {
     if (!hasHydrated) return
-    if (!turnoAtivo) router.replace('/turno/novo')
+    console.log('[Tabs] hydrated | turnoAtivo:', !!turnoAtivo)
+    if (!turnoAtivo) { console.log('[Tabs] -> turno/novo'); router.replace('/turno/novo') }
   }, [hasHydrated])
 
   // Ainda carregando store do AsyncStorage
@@ -29,6 +30,7 @@ export default function TabsLayout() {
   }
 
   if (!turnoAtivo) return null
+  console.log('[Tabs] render | frente:', turnoAtivo.frente_nome)
 
   return (
     <View style={{ flex: 1 }}>

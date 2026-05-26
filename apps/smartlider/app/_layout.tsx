@@ -51,16 +51,21 @@ export default function RootLayout() {
 
   useEffect(() => {
     const init = async () => {
+      console.log('[Boot] init start')
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        const { data: { session }, error } = await supabase.auth.getSession()
+        if (error) console.warn('[Boot] getSession error:', error.message)
         const inAuth = segments[0] === '(auth)'
-        if (!session && !inAuth) router.replace('/(auth)/login')
-        if (session  &&  inAuth) router.replace('/(tabs)')
+        console.log('[Boot] session:', !!session, '| inAuth:', inAuth)
+        if (!session && !inAuth) { console.log('[Boot] -> login'); router.replace('/(auth)/login') }
+        if (session  &&  inAuth) { console.log('[Boot] -> tabs');  router.replace('/(tabs)') }
         if (session) fetchAndSetWorkspace(session.user.id, setWorkspaceId)
-      } catch {
+      } catch (e: any) {
+        console.error('[Boot] CRASH:', e?.message)
         router.replace('/(auth)/login')
       } finally {
         setReady(true)
+        console.log('[Boot] ready')
       }
     }
     init()
