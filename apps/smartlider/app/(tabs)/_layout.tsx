@@ -89,7 +89,7 @@ export default function TabsLayout() {
             ),
             tabBarLabel: () => null,
           }}
-          listeners={{ tabPress: e => { e.preventDefault(); router.push('/apontamento/index') } }}
+          listeners={{ tabPress: e => { e.preventDefault(); router.push('/apontamento') } }}
         />
         <Tabs.Screen
           name="solicitacoes"

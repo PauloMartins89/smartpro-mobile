@@ -1,10 +1,32 @@
 import { useEffect, useState } from 'react'
-import { View, ActivityIndicator } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
 import { Stack } from 'expo-router'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { supabase } from '../src/lib/supabase'
 import { useRouter, useSegments } from 'expo-router'
+import { Ionicons } from '@expo/vector-icons'
 import useLiderStore from '../src/store/useLiderStore'
+
+// Error boundary global — captura crashes de render em qualquer rota
+export function ErrorBoundary({ error, retry }: { error: Error; retry: () => void }) {
+  return (
+    <View style={eb.container}>
+      <Ionicons name="warning-outline" size={48} color="#F59E0B" style={{ marginBottom: 16 }} />
+      <Text style={eb.title}>Algo deu errado</Text>
+      <Text style={eb.msg}>{error?.message || 'Erro desconhecido'}</Text>
+      <TouchableOpacity style={eb.btn} onPress={retry}>
+        <Text style={eb.btnText}>Tentar novamente</Text>
+      </TouchableOpacity>
+    </View>
+  )
+}
+const eb = StyleSheet.create({
+  container:  { flex: 1, backgroundColor: '#0D1B2A', justifyContent: 'center', alignItems: 'center', padding: 32 },
+  title:      { color: '#fff', fontSize: 20, fontWeight: '700', marginBottom: 8 },
+  msg:        { color: '#94A3B8', fontSize: 13, textAlign: 'center', marginBottom: 32 },
+  btn:        { backgroundColor: '#22C55E', borderRadius: 12, paddingVertical: 14, paddingHorizontal: 32, width: '100%', alignItems: 'center' },
+  btnText:    { color: '#fff', fontSize: 15, fontWeight: '700' },
+})
 
 const GLOBAL_WS = '00000000-0000-0000-0000-000000000001'
 
