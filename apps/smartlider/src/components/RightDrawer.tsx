@@ -6,24 +6,10 @@ import {
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { C, TURNO_LABEL, fmtDate } from '../lib/theme'
+import useLiderStore from '../store/useLiderStore'
 import type { TurnoAtivo } from '../store/useLiderStore'
 
 const DRAWER_WIDTH = Math.min(Dimensions.get('window').width * 0.88, 340)
-
-interface DrawerData {
-  presentes:           number
-  total_colaboradores: number
-  maquinas:            number
-  ha_realizado:        number
-  ha_meta:             number
-  refeicoes:           number
-  epis_pendentes:      number
-  solicitacoes:        number
-  afericoes_reprovadas:number
-  epis_vencendo:       number
-  avaliacao_media:     number
-  insumos_divergentes: number
-}
 
 interface Props {
   visible:    boolean
@@ -32,9 +18,13 @@ interface Props {
 }
 
 export default function RightDrawer({ visible, onClose, turnoAtivo }: Props) {
-  const translateX = useRef(new Animated.Value(DRAWER_WIDTH)).current
-  const [data,    setData]    = useState<DrawerData | null>(null)
-  const [loading, setLoading] = useState(false)
+  const translateX    = useRef(new Animated.Value(DRAWER_WIDTH)).current
+  const turnoStats    = useLiderStore(s => s.turnoStats)
+  const setTurnoStats = useLiderStore(s => s.setTurnoStats)
+  const [refreshing, setRefreshing] = useState(false)
+
+  // data vem do cache local (AsyncStorage) — funciona offline
+  const data = turnoStats
 
   /* Animação de entrada/saída */
   useEffect(() => {
@@ -44,64 +34,77 @@ export default function RightDrawer({ visible, onClose, turnoAtivo }: Props) {
       tension:         70,
       friction:        12,
     }).start()
-    if (visible) carregarDados()
+    // Ao abrir: tenta atualizar do servidor em background (não bloqueia)
+    if (visible) atualizarDoServidor()
   }, [visible])
 
-  async function carregarDados() {
-    setLoading(true)
-    const tid = turnoAtivo.id
+  async function atualizarDoServidor() {
+    setRefreshing(true)
+    try {
+      const tid = turnoAtivo.id
+      const [
+        { count: presentes },
+        { count: total },
+        { count: maquinas },
+        { data: prodData },
+        { count: refeicoes },
+        { count: epis },
+        { count: solicitacoes },
+        { count: afericoes_reprovadas },
+        { count: epis_vencendo },
+        { data: avaliacoes },
+        { count: insumos_divergentes },
+      ] = await Promise.all([
+        supabase.from('lider_mao_obra').select('*', { count: 'exact', head: true }).eq('turno_id', tid).eq('presente', true),
+        supabase.from('lider_mao_obra').select('*', { count: 'exact', head: true }).eq('turno_id', tid),
+        supabase.from('lider_apontamentos_maquina').select('*', { count: 'exact', head: true }).eq('turno_id', tid),
+        supabase.from('lider_produtividade_equipe').select('realizado_ha, meta_ha').eq('turno_id', tid),
+        supabase.from('lider_solicitacoes_refeicao').select('*', { count: 'exact', head: true }).eq('turno_id', tid),
+        supabase.from('lider_solicitacoes_epi').select('*', { count: 'exact', head: true }).eq('turno_id', tid).eq('status', 'pendente'),
+        supabase.from('lider_solicitacoes_insumo').select('*', { count: 'exact', head: true }).eq('turno_id', tid).eq('status', 'pendente'),
+        supabase.from('lider_afericoes').select('*', { count: 'exact', head: true }).eq('turno_id', tid).eq('status', 'reprovado'),
+        supabase.from('lider_controle_epi').select('*', { count: 'exact', head: true }).eq('turno_id', tid).in('status', ['vencendo', 'vencido']),
+        supabase.from('lider_avaliacoes_equipe').select('nota_geral').eq('turno_id', tid),
+        supabase.from('lider_apontamentos_insumo').select('*', { count: 'exact', head: true }).eq('turno_id', tid).eq('status', 'divergente'),
+      ])
 
-    const [
-      { count: presentes },
-      { count: total },
-      { count: maquinas },
-      { data: prodData },
-      { count: refeicoes },
-      { count: epis },
-      { count: solicitacoes },
-      { count: afericoes_reprovadas },
-      { count: epis_vencendo },
-      { data: avaliacoes },
-      { count: insumos_divergentes },
-    ] = await Promise.all([
-      supabase.from('lider_mao_obra').select('*', { count: 'exact', head: true }).eq('turno_id', tid).eq('presente', true),
-      supabase.from('lider_mao_obra').select('*', { count: 'exact', head: true }).eq('turno_id', tid),
-      supabase.from('lider_apontamentos_maquina').select('*', { count: 'exact', head: true }).eq('turno_id', tid),
-      supabase.from('lider_produtividade_equipe').select('realizado_ha, meta_ha').eq('turno_id', tid),
-      supabase.from('lider_solicitacoes_refeicao').select('*', { count: 'exact', head: true }).eq('turno_id', tid),
-      supabase.from('lider_solicitacoes_epi').select('*', { count: 'exact', head: true }).eq('turno_id', tid).eq('status', 'pendente'),
-      supabase.from('lider_solicitacoes_insumo').select('*', { count: 'exact', head: true }).eq('turno_id', tid).eq('status', 'pendente'),
-      supabase.from('lider_afericoes').select('*', { count: 'exact', head: true }).eq('turno_id', tid).eq('status', 'reprovado'),
-      supabase.from('lider_controle_epi').select('*', { count: 'exact', head: true }).eq('turno_id', tid).in('status', ['vencendo', 'vencido']),
-      supabase.from('lider_avaliacoes_equipe').select('nota_geral').eq('turno_id', tid),
-      supabase.from('lider_apontamentos_insumo').select('*', { count: 'exact', head: true }).eq('turno_id', tid).eq('status', 'divergente'),
-    ])
+      const ha_realizado    = prodData?.reduce((s, r) => s + (r.realizado_ha ?? 0), 0) ?? 0
+      const ha_meta         = prodData?.reduce((s, r) => s + (r.meta_ha      ?? 0), 0) ?? 0
+      const avaliacao_media = avaliacoes?.length
+        ? Math.round((avaliacoes.reduce((s, r) => s + (r.nota_geral ?? 0), 0) / avaliacoes.length) * 10) / 10
+        : 0
 
-    const ha_realizado = prodData?.reduce((s, r) => s + (r.realizado_ha ?? 0), 0) ?? 0
-    const ha_meta      = prodData?.reduce((s, r) => s + (r.meta_ha      ?? 0), 0) ?? 0
-    const avaliacao_media = avaliacoes?.length
-      ? Math.round((avaliacoes.reduce((s, r) => s + (r.nota_geral ?? 0), 0) / avaliacoes.length) * 10) / 10
-      : 0
-
-    setData({
-      presentes:            presentes  ?? 0,
-      total_colaboradores:  total      ?? 0,
-      maquinas:             maquinas   ?? 0,
-      ha_realizado,
-      ha_meta,
-      refeicoes:            refeicoes  ?? 0,
-      epis_pendentes:       epis       ?? 0,
-      solicitacoes:         solicitacoes ?? 0,
-      afericoes_reprovadas: afericoes_reprovadas ?? 0,
-      epis_vencendo:        epis_vencendo ?? 0,
-      avaliacao_media,
-      insumos_divergentes:  insumos_divergentes ?? 0,
-    })
-    setLoading(false)
+      setTurnoStats({
+        presentes:            presentes  ?? 0,
+        total_colaboradores:  total      ?? 0,
+        maquinas:             maquinas   ?? 0,
+        ha_realizado,
+        ha_meta,
+        refeicoes:            refeicoes  ?? 0,
+        epis_pendentes:       epis       ?? 0,
+        solicitacoes:         solicitacoes ?? 0,
+        afericoes_reprovadas: afericoes_reprovadas ?? 0,
+        epis_vencendo:        epis_vencendo ?? 0,
+        avaliacao_media,
+        insumos_divergentes:  insumos_divergentes ?? 0,
+        updatedAt:            new Date().toISOString(),
+      })
+    } catch {
+      // sem rede — mantém cache local
+    } finally {
+      setRefreshing(false)
+    }
   }
 
   const efic    = data?.ha_meta ? Math.round((data.ha_realizado / data.ha_meta) * 100) : 0
   const eficCor = efic >= 100 ? C.drawerGreen : efic >= 70 ? C.drawerYellow : C.drawerRed
+
+  // Formata quando foi atualizado
+  function fmtUpdated(iso: string | null) {
+    if (!iso) return ''
+    const d = new Date(iso)
+    return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`
+  }
 
   return (
     <>
@@ -122,8 +125,7 @@ export default function RightDrawer({ visible, onClose, turnoAtivo }: Props) {
           </TouchableOpacity>
         </View>
 
-        {/* Info do turno */}
-        <View style={styles.turnoCard}>
+        {/* Info do turno */}        <View style={styles.turnoCard}>
           <View style={styles.turnoRow}>
             <View style={styles.statusDot} />
             <Text style={styles.turnoFrente}>{turnoAtivo.frente_nome}</Text>
@@ -138,8 +140,29 @@ export default function RightDrawer({ visible, onClose, turnoAtivo }: Props) {
         {/* Divisor */}
         <View style={styles.divider} />
 
-        {loading
-          ? <ActivityIndicator color={C.drawerGreen} style={{ marginTop: 32 }} />
+        {/* Indicador de atualização */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 4 }}>
+          {refreshing
+            ? <ActivityIndicator size="small" color={C.drawerGreen} style={{ marginRight: 6 }} />
+            : <Ionicons name="checkmark-circle" size={14} color={data ? C.drawerGreen : C.drawerTextSub} style={{ marginRight: 6 }} />
+          }
+          <Text style={{ fontSize: 11, color: C.drawerTextSub }}>
+            {refreshing
+              ? 'Atualizando...'
+              : data?.updatedAt
+                ? `Atualizado às ${fmtUpdated(data.updatedAt)}`
+                : 'Sem dados (offline)'}
+          </Text>
+        </View>
+
+        {!data
+          ? (
+            <View style={{ alignItems: 'center', marginTop: 40 }}>
+              <Ionicons name="cloud-offline-outline" size={40} color={C.drawerTextSub} />
+              <Text style={{ color: C.drawerTextSub, marginTop: 12, fontSize: 13 }}>Sem dados disponíveis</Text>
+              <Text style={{ color: C.drawerTextSub, fontSize: 11, marginTop: 4 }}>Conecte-se para carregar</Text>
+            </View>
+          )
           : (
             <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
               <DrawerSection titulo="Operacional">

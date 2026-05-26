@@ -16,13 +16,31 @@ export interface TurnoAtivo {
   status:      'aberto' | 'fechado'
 }
 
+export interface TurnoStats {
+  presentes:            number
+  total_colaboradores:  number
+  maquinas:             number
+  ha_realizado:         number
+  ha_meta:              number
+  refeicoes:            number
+  epis_pendentes:       number
+  solicitacoes:         number
+  afericoes_reprovadas: number
+  epis_vencendo:        number
+  avaliacao_media:      number
+  insumos_divergentes:  number
+  updatedAt:            string | null
+}
+
 interface LiderStore {
-  turnoAtivo:  TurnoAtivo | null
-  workspaceId: string
+  turnoAtivo:    TurnoAtivo | null
+  workspaceId:   string
   dashRefreshKey: number
+  turnoStats:    TurnoStats | null
   setTurnoAtivo:      (turno: TurnoAtivo | null) => void
   setWorkspaceId:     (id: string) => void
   triggerDashRefresh: () => void
+  setTurnoStats:      (stats: TurnoStats) => void
 }
 
 const useLiderStore = create<LiderStore>()(
@@ -31,9 +49,11 @@ const useLiderStore = create<LiderStore>()(
       turnoAtivo:  null,
       workspaceId: '',
       dashRefreshKey: 0,
+      turnoStats:  null,
       setTurnoAtivo:      turno => set({ turnoAtivo: turno }),
       setWorkspaceId:     id    => set({ workspaceId: id }),
       triggerDashRefresh: ()    => set(s => ({ dashRefreshKey: s.dashRefreshKey + 1 })),
+      setTurnoStats:      stats => set({ turnoStats: stats }),
     }),
     {
       name:    'smartlider-store',
@@ -41,6 +61,7 @@ const useLiderStore = create<LiderStore>()(
       partialize: (state) => ({
         turnoAtivo:  state.turnoAtivo,
         workspaceId: state.workspaceId,
+        turnoStats:  state.turnoStats,
       }),
     }
   )
