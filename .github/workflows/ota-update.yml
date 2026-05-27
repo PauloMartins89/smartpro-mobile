@@ -1,6 +1,7 @@
 name: OTA Update (sem novo APK)
 
 on:
+  workflow_dispatch:
   push:
     branches: [master]
     paths:
