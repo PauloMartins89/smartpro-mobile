@@ -3,8 +3,8 @@ import { useState, useCallback } from 'react'
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Share } from 'react-native'
 import { useNavigation } from 'expo-router'
 import { useEffect } from 'react'
-import { getLogs, clearLogs, type LogEntry } from '../../src/lib/logger'
-import { C } from '../../src/lib/theme'
+import { getLogs, clearLogs, type LogEntry } from '../src/lib/logger'
+import { C } from '../src/lib/theme'
 
 const LEVEL_COLOR = { log: '#F0F6FC', warn: '#D29922', error: '#F85149' }
 const LEVEL_BG    = { log: 'transparent', warn: '#2D1B00', error: '#2D0000' }
