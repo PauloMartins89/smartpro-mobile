@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import useLiderStore from '../../src/store/useLiderStore'
 import { C, TURNO_LABEL } from '../../src/lib/theme'
 import RightDrawer from '../../src/components/RightDrawer'
+import useSyncQueue from '../../src/store/useSyncQueue'
 
 export default function TabsLayout() {
   const router              = useRouter()
@@ -12,6 +13,9 @@ export default function TabsLayout() {
   const triggerDashRefresh  = useLiderStore(s => s.triggerDashRefresh)
   const hasHydrated         = useLiderStore(s => s._hasHydrated)
   const [drawerOpen, setDrawerOpen] = useState(false)
+
+  // Auto-sync offline queue ao voltar ao foreground
+  useSyncQueue()
 
   // Aguarda hidratação do AsyncStorage antes de decidir rota
   useEffect(() => {
