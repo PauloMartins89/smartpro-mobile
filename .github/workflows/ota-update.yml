@@ -31,7 +31,10 @@ jobs:
 
       - name: Publicar OTA update
         working-directory: apps/smartlider
-        run: npx eas-cli update --branch preview --message "${{ github.event.head_commit.message }}" --non-interactive
+        run: |
+          MSG="${{ github.event.head_commit.message }}"
+          if [ -z "$MSG" ]; then MSG="OTA update manual"; fi
+          npx eas-cli update --branch preview --message "$MSG" --non-interactive
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
