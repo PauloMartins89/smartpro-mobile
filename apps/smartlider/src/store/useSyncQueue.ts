@@ -42,8 +42,12 @@ export default function useSyncQueue() {
   useEffect(() => {
     // Se já há pendências ao montar, tenta imediatamente (volta de background ou
     // reabertura do app)
+    console.log(`[sync-queue] montou | queue=${queue.length}`)
     if (queue.length > 0) {
-      isOnline().then(online => { if (online) sync() })
+      isOnline().then(online => {
+        console.log(`[sync-queue] isOnline=${online} | queue=${queue.length}`)
+        if (online) sync()
+      })
     }
 
     const sub = AppState.addEventListener('change', async (nextState: AppStateStatus) => {

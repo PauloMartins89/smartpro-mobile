@@ -46,6 +46,7 @@ const useSyncStore = create<SyncStore>()(
 
       sync: async () => {
         const { queue } = get()
+        console.log(`[sync] iniciando | queue=${queue.length}`)
         if (!queue.length) return { ok: 0, fail: 0 }
         set({ isSyncing: true })
         let ok = 0; let fail = 0
@@ -54,11 +55,12 @@ const useSyncStore = create<SyncStore>()(
           try {
             const { error } =
               record.action === 'insert'
-                ? await supabase.from(record.table).insert(record.payload)
+                ? await supabase.from(record.table).upsert(record.payload, { onConflict: 'id' })
                 : await supabase.from(record.table).update(record.payload).eq('id', record.payload.id)
 
             if (error) {
               fail++
+              console.error(`[sync] ERRO tabela=${record.table} id=${record.id} tentativa=${record.attempts + 1} | code=${error.code} msg=${error.message}`)
               set(s => ({
                 queue: s.queue.map(r =>
                   r.id === record.id ? { ...r, attempts: r.attempts + 1 } : r
