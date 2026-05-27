@@ -9,90 +9,79 @@ import { supabase } from '../../src/lib/supabase'
 import useLiderStore, { type Turno } from '../../src/store/useLiderStore'
 import { C, TURNO_LABEL, todayISO, fmtDate } from '../../src/lib/theme'
 
-type Frente = { id: string; codigo: string; nome: string }
-type Equipe  = { id: string; codigo: string; nome: string }
+type EquipeComFrente = {
+  id:          string
+  codigo:      string
+  nome:        string
+  workspace_id: string
+  frente:      { id: string; codigo: string; nome: string } | null
+}
 
 export default function IniciarTurnoScreen() {
-  const router         = useRouter()
+  const router = useRouter()
   const { workspaceId, setTurnoAtivo, setWorkspaceId } = useLiderStore()
 
-  const [frentes,  setFrentes]  = useState<Frente[]>([])
-  const [equipes,  setEquipes]  = useState<Equipe[]>([])
-  const [frente,   setFrente]   = useState<Frente | null>(null)
-  const [equipe,   setEquipe]   = useState<Equipe | null>(null)
-  const [turno,    setTurno]    = useState<Turno>('manha')
-  const [data,     setData]     = useState(todayISO())
-  const [loading,  setLoading]  = useState(false)
-  const [fetching, setFetching] = useState(true)
+  // Equipes vinculadas a este líder
+  const [liderEquipes, setLiderEquipes] = useState<EquipeComFrente[]>([])
+  const [equipe,       setEquipe]       = useState<EquipeComFrente | null>(null)
+  const [turno,        setTurno]        = useState<Turno>('manha')
+  const [data,         setData]         = useState(todayISO())
+  const [loading,      setLoading]      = useState(false)
+  const [fetching,     setFetching]     = useState(true)
+  const [liderEmail,   setLiderEmail]   = useState('')
 
-  // Carrega frentes — sempre via auth + lider_equipes (garante workspace correto)
+  // Carrega equipes do líder automaticamente pelo auth
   useEffect(() => {
     let cancelled = false
-    async function carregarFrentes() {
+    async function carregar() {
       try {
-        // 1) Obtém usuário autenticado
         const { data: authData } = await supabase.auth.getUser()
         const uid   = authData.user?.id
-        const email = authData.user?.email
+        const email = authData.user?.email ?? ''
         if (!uid) { if (!cancelled) setFetching(false); return }
+        if (!cancelled) setLiderEmail(email)
 
-        // 2) Descobre workspace pelo lider_id ou lider_email
-        let wsId = ''
-        const { data: eqById } = await supabase
+        // Busca equipes vinculadas por lider_id ou lider_email, com frente via join
+        const { data: rows } = await supabase
           .from('lider_equipes')
-          .select('workspace_id')
-          .eq('lider_id', uid)
-          .limit(1)
-          .maybeSingle()
-        if (eqById?.workspace_id) {
-          wsId = eqById.workspace_id
-        } else if (email) {
-          const { data: eqByEmail } = await supabase
-            .from('lider_equipes')
-            .select('workspace_id')
-            .eq('lider_email', email)
-            .limit(1)
-            .maybeSingle()
-          if (eqByEmail?.workspace_id) wsId = eqByEmail.workspace_id
-        }
-
-        if (!wsId && workspaceId) wsId = workspaceId
-
-        if (!wsId) { if (!cancelled) setFetching(false); return }
-
-        if (!cancelled) setWorkspaceId(wsId)
-
-        const { data: frs, error } = await supabase
-          .from('lider_frentes')
-          .select('id, codigo, nome')
-          .eq('workspace_id', wsId)
+          .select('id, codigo, nome, workspace_id, lider_frentes(id, codigo, nome)')
+          .or(`lider_id.eq.${uid},lider_email.eq.${email}`)
           .eq('ativo', true)
           .order('codigo')
-        if (!cancelled) {
-          if (!error && frs) setFrentes(frs)
-          setFetching(false)
-        }
+
+        if (cancelled) return
+
+        const equipes: EquipeComFrente[] = (rows ?? []).map((r: any) => ({
+          id:           r.id,
+          codigo:       r.codigo,
+          nome:         r.nome,
+          workspace_id: r.workspace_id,
+          frente:       r.lider_frentes ?? null,
+        }))
+
+        setLiderEquipes(equipes)
+
+        // Salva workspace no store
+        const wsId = equipes[0]?.workspace_id ?? workspaceId
+        if (wsId) setWorkspaceId(wsId)
+
+        // Auto-seleciona se só tem uma equipe
+        if (equipes.length === 1) setEquipe(equipes[0])
+
+        setFetching(false)
       } catch {
         if (!cancelled) setFetching(false)
       }
     }
-    carregarFrentes()
+    carregar()
     return () => { cancelled = true }
   }, [])
 
-  // Carrega equipes quando frente muda
-  useEffect(() => {
-    if (!frente) { setEquipes([]); setEquipe(null); return }
-    supabase.from('lider_equipes').select('id, codigo, nome').eq('frente_id', frente.id).eq('ativo', true)
-      .order('codigo').then(({ data, error }) => {
-        if (!error && data) setEquipes(data)
-        setEquipe(null)
-      })
-  }, [frente])
-
   async function handleIniciar() {
-    if (!frente)  { Alert.alert('Atenção', 'Selecione a frente de trabalho'); return }
-    if (!equipe)  { Alert.alert('Atenção', 'Selecione a equipe'); return }
+    if (!equipe) { Alert.alert('Atenção', 'Selecione a equipe'); return }
+
+    const frente = equipe.frente
+    if (!frente) { Alert.alert('Atenção', 'Esta equipe não possui frente vinculada.'); return }
 
     setLoading(true)
     try {
@@ -115,7 +104,7 @@ export default function IniciarTurnoScreen() {
         }
       } else {
         const { data: novo, error } = await supabase.from('lider_turnos').insert({
-          workspace_id: workspaceId,
+          workspace_id: equipe.workspace_id,
           frente_id:    frente.id,
           equipe_id:    equipe.id,
           lider_id:     user.user?.id,
@@ -143,7 +132,7 @@ export default function IniciarTurnoScreen() {
         status: 'aberto',
       })
       router.replace('/(tabs)')
-    } catch (e: any) {
+    } catch {
       Alert.alert('Erro', 'Falha ao iniciar turno. Verifique sua conexão.')
     } finally {
       setLoading(false)
@@ -162,6 +151,9 @@ export default function IniciarTurnoScreen() {
     </View>
   )
 
+  // Matrícula exibida = prefixo do email (ex: "10021002@lider.smartpro" → "10021002")
+  const matricula = liderEmail.split('@')[0] ?? liderEmail
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -175,47 +167,59 @@ export default function IniciarTurnoScreen() {
           </TouchableOpacity>
           <View>
             <Text style={styles.headerTitle}>Iniciar Turno</Text>
-            <Text style={styles.headerSub}>{fmtDate(data)}</Text>
+            <Text style={styles.headerSub}>
+              {matricula ? `Matrícula ${matricula}  ·  ` : ''}{fmtDate(data)}
+            </Text>
           </View>
         </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Seleção de Frente */}
-        <Section label="Frente de Trabalho">
-          {frentes.length === 0
-            ? <Text style={styles.empty}>Nenhuma frente cadastrada</Text>
-            : frentes.map(f => (
-              <SelCard
-                key={f.id}
-                label={f.codigo}
-                sub={f.nome}
-                selected={frente?.id === f.id}
-                onPress={() => setFrente(f)}
-              />
-            ))
-          }
-        </Section>
 
-        {/* Seleção de Equipe */}
-        {frente && (
-          <Section label="Equipe">
-            {equipes.length === 0
-              ? <Text style={styles.empty}>Nenhuma equipe nesta frente</Text>
-              : equipes.map(e => (
-                <SelCard
-                  key={e.id}
-                  label={e.codigo}
-                  sub={e.nome}
-                  selected={equipe?.id === e.id}
-                  onPress={() => setEquipe(e)}
-                />
-              ))
-            }
+        {/* Equipe — auto ou picker */}
+        {liderEquipes.length === 0 ? (
+          <View style={styles.alertCard}>
+            <Ionicons name="warning-outline" size={22} color="#F59E0B" />
+            <Text style={styles.alertText}>
+              Nenhuma equipe vinculada a esta matrícula.{'\n'}
+              Contate o administrador.
+            </Text>
+          </View>
+        ) : liderEquipes.length === 1 ? (
+          /* Equipe única: card fixo — sem seleção manual */
+          <View style={styles.autoCard}>
+            <View style={styles.autoCardLeft}>
+              <Ionicons name="people" size={22} color={C.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.autoLabel}>Sua Equipe</Text>
+              <Text style={styles.autoEquipe}>
+                {liderEquipes[0].codigo} · {liderEquipes[0].nome}
+              </Text>
+              {liderEquipes[0].frente && (
+                <Text style={styles.autoFrente}>
+                  {liderEquipes[0].frente.codigo} · {liderEquipes[0].frente.nome}
+                </Text>
+              )}
+            </View>
+            <Ionicons name="checkmark-circle" size={22} color={C.primary} />
+          </View>
+        ) : (
+          /* Múltiplas equipes: picker */
+          <Section label="Selecione sua Equipe">
+            {liderEquipes.map(e => (
+              <SelCard
+                key={e.id}
+                label={e.codigo}
+                sub={e.frente ? `${e.frente.codigo} · ${e.nome}` : e.nome}
+                selected={equipe?.id === e.id}
+                onPress={() => setEquipe(e)}
+              />
+            ))}
           </Section>
         )}
 
-        {/* Seleção de Turno */}
+        {/* Turno */}
         <Section label="Turno">
           <View style={styles.turnoRow}>
             {TURNOS.map(t => (
@@ -234,14 +238,16 @@ export default function IniciarTurnoScreen() {
           </View>
         </Section>
 
-        {/* Resumo antes de confirmar */}
-        {frente && equipe && (
+        {/* Resumo de confirmação */}
+        {equipe && (
           <View style={styles.resumoCard}>
-            <Text style={styles.resumoTitle}>Confirmar Turno</Text>
-            <Row label="Frente"  value={`${frente.codigo} · ${frente.nome}`} />
-            <Row label="Equipe"  value={`${equipe.codigo} · ${equipe.nome}`} />
-            <Row label="Turno"   value={TURNO_LABEL[turno]} />
-            <Row label="Data"    value={fmtDate(data)} />
+            <Text style={styles.resumoTitle}>Confirmar</Text>
+            {equipe.frente && (
+              <Row label="Frente" value={`${equipe.frente.codigo} · ${equipe.frente.nome}`} />
+            )}
+            <Row label="Equipe" value={`${equipe.codigo} · ${equipe.nome}`} />
+            <Row label="Turno"  value={TURNO_LABEL[turno]} />
+            <Row label="Data"   value={fmtDate(data)} />
           </View>
         )}
 
@@ -251,9 +257,9 @@ export default function IniciarTurnoScreen() {
       {/* Botão fixo no rodapé */}
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[styles.btn, (!frente || !equipe) && styles.btnDisabled]}
+          style={[styles.btn, !equipe && styles.btnDisabled]}
           onPress={handleIniciar}
-          disabled={!frente || !equipe || loading}
+          disabled={!equipe || loading}
           activeOpacity={0.85}
         >
           {loading
@@ -309,6 +315,13 @@ const styles = StyleSheet.create({
   scroll:         { padding: 16 },
   section:        { marginBottom: 20 },
   sectionLabel:   { fontSize: 11, fontWeight: '700', color: C.textSub, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 },
+  autoCard:       { flexDirection: 'row', alignItems: 'center', borderWidth: 2, borderColor: C.primary, borderRadius: 14, padding: 16, marginBottom: 20, backgroundColor: C.greenBg, gap: 12 },
+  autoCardLeft:   { width: 40, height: 40, borderRadius: 20, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' },
+  autoLabel:      { fontSize: 11, fontWeight: '700', color: C.primaryDark, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 },
+  autoEquipe:     { fontSize: 16, fontWeight: '700', color: C.text },
+  autoFrente:     { fontSize: 12, color: C.textSub, marginTop: 2 },
+  alertCard:      { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#FEF9C3', borderRadius: 12, padding: 14, marginBottom: 20, borderWidth: 1, borderColor: '#FDE047' },
+  alertText:      { flex: 1, fontSize: 13, color: '#92400E', lineHeight: 18 },
   selCard:        { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: C.border, borderRadius: 12, padding: 14, marginBottom: 8, backgroundColor: C.bgCard },
   selCardActive:  { borderColor: C.primary, backgroundColor: C.greenBg },
   selLabel:       { fontSize: 15, fontWeight: '700', color: C.text, width: 60 },
