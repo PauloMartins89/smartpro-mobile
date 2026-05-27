@@ -7,6 +7,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../../src/lib/supabase'
 import useLiderStore from '../../src/store/useLiderStore'
 import useSyncStore from '../../src/store/useSyncStore'
+import useLookupCache from '../../src/store/useLookupCache'
 import { C, fmtDate } from '../../src/lib/theme'
 import { StatCard, StatusChip, SyncBanner, Section, EmptyList } from '../../src/components/ModuleShared'
 
@@ -54,11 +55,19 @@ export default function SolicitacaoEpiScreen() {
     setLoading(false)
   }, [turnoAtivo?.id])
 
+  const lookupCache = useLookupCache()
+
   useEffect(() => {
+    const kColabs = `colaboradores:${turnoAtivo?.equipe_id}`
+    const kEpis   = `epis:${workspaceId}`
+    const cc = lookupCache.get(kColabs); if (cc.length) setColabs(cc)
+    const ce = lookupCache.get(kEpis);   if (ce.length) setEpis(ce)
     supabase.from('lider_colaboradores').select('id, nome, funcao').eq('equipe_id', turnoAtivo?.equipe_id ?? '').eq('ativo', true).order('nome')
-      .then(({ data }) => setColabs(data ?? []))
+      .then(({ data }) => { if (data) { setColabs(data); lookupCache.set(kColabs, data) } })
+      .catch(() => {})
     supabase.from('lider_epis').select('id, nome, categoria, ca').eq('workspace_id', workspaceId).eq('ativo', true).order('nome')
-      .then(({ data }) => setEpis(data ?? []))
+      .then(({ data }) => { if (data) { setEpis(data); lookupCache.set(kEpis, data) } })
+      .catch(() => {})
     carregar()
   }, [carregar])
 

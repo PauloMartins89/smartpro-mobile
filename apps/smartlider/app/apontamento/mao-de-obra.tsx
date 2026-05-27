@@ -11,6 +11,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../../src/lib/supabase'
 import useLiderStore from '../../src/store/useLiderStore'
 import useSyncStore from '../../src/store/useSyncStore'
+import useLookupCache from '../../src/store/useLookupCache'
 import { C } from '../../src/lib/theme'
 import { StatCard, SyncBanner, EmptyList } from '../../src/components/ModuleShared'
 
@@ -72,11 +73,16 @@ export default function MaoDeObraScreen() {
     setLoading(false)
   }, [turnoAtivo?.id])
 
+  const lookupCache = useLookupCache()
+
   useEffect(() => {
+    const key = `colaboradores:${turnoAtivo?.equipe_id}`
+    const cached = lookupCache.get(key); if (cached.length) setColabs(cached)
     supabase.from('lider_colaboradores').select('id, nome, cargo')
       .eq('equipe_id', turnoAtivo?.equipe_id ?? '')
       .eq('ativo', true).order('nome')
-      .then(({ data }) => setColabs(data ?? []))
+      .then(({ data }) => { if (data) { setColabs(data); lookupCache.set(key, data) } })
+      .catch(() => {})
     carregar()
   }, [carregar])
 

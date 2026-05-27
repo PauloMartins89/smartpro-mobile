@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../src/lib/supabase'
 import useLiderStore from '../../src/store/useLiderStore'
 import useSyncStore from '../../src/store/useSyncStore'
+import useLookupCache from '../../src/store/useLookupCache'
 import { C, fmtDate } from '../../src/lib/theme'
 import { StatCard, StatusChip, SyncBanner, Section, EmptyList } from '../../src/components/ModuleShared'
 
@@ -58,13 +59,21 @@ export default function AfericaoScreen() {
     setLoading(false)
   }, [turnoAtivo?.id])
 
+  const lookupCache = useLookupCache()
+
   useEffect(() => {
+    const kImpl = `implementos:${workspaceId}`
+    const kMaq  = `maquinas:${workspaceId}`
+    const ci = lookupCache.get(kImpl); if (ci.length) setImplementos(ci)
+    const cm = lookupCache.get(kMaq);  if (cm.length) setMaquinas(cm)
     supabase.from('lider_implementos').select('id, nome, largura_m')
       .eq('workspace_id', workspaceId).eq('ativo', true).order('nome')
-      .then(({ data }) => setImplementos(data ?? []))
+      .then(({ data }) => { if (data) { setImplementos(data); lookupCache.set(kImpl, data) } })
+      .catch(() => {})
     supabase.from('lider_maquinas').select('id, nome, codigo, tipo')
       .eq('workspace_id', workspaceId).eq('ativo', true).order('nome')
-      .then(({ data }) => setMaquinas(data ?? []))
+      .then(({ data }) => { if (data) { setMaquinas(data); lookupCache.set(kMaq, data) } })
+      .catch(() => {})
     carregar()
   }, [carregar])
 

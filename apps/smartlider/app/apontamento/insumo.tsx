@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../src/lib/supabase'
 import useLiderStore from '../../src/store/useLiderStore'
 import useSyncStore from '../../src/store/useSyncStore'
+import useLookupCache from '../../src/store/useLookupCache'
 import { C, fmtDate } from '../../src/lib/theme'
 import { StatCard, StatusChip, SyncBanner, Section, EmptyList } from '../../src/components/ModuleShared'
 
@@ -64,9 +65,14 @@ export default function InsumoApontamentoScreen() {
     setLoading(false)
   }, [turnoAtivo?.id])
 
+  const lookupCache = useLookupCache()
+
   useEffect(() => {
+    const key = `produtos:${workspaceId}`
+    const cached = lookupCache.get(key); if (cached.length) setProdutos(cached)
     supabase.from('lider_produtos').select('id, nome, unidade').eq('workspace_id', workspaceId).eq('ativo', true).order('nome')
-      .then(({ data }) => setProdutos(data ?? []))
+      .then(({ data }) => { if (data) { setProdutos(data); lookupCache.set(key, data) } })
+      .catch(() => {})
     carregar()
   }, [carregar])
 
