@@ -35,14 +35,21 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          DOWNLOAD_URL=$(npx eas build \
+          npx eas build \
             --platform android \
             --profile ${{ github.event.inputs.profile || 'preview' }} \
             --non-interactive \
-            --wait \
-            --json 2>/dev/null | jq -r '.artifacts.buildUrl')
-          echo "APK URL: $DOWNLOAD_URL"
-          curl -L "$DOWNLOAD_URL" -o build.apk
+            --wait
+
+      - name: Download APK
+        working-directory: apps/smartlider
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          npx eas build:download \
+            --platform android \
+            --latest \
+            --output ./build.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
