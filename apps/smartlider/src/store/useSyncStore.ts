@@ -59,13 +59,20 @@ const useSyncStore = create<SyncStore>()(
                 : await supabase.from(record.table).update(record.payload).eq('id', record.payload.id)
 
             if (error) {
-              fail++
-              console.error(`[sync] ERRO tabela=${record.table} id=${record.id} tentativa=${record.attempts + 1} | code=${error.code} msg=${error.message}`)
-              set(s => ({
-                queue: s.queue.map(r =>
-                  r.id === record.id ? { ...r, attempts: r.attempts + 1 } : r
-                ),
-              }))
+              // 23505 = unique violation → dado já existe no banco (sync anterior ok)
+              if (error.code === '23505') {
+                console.log(`[sync] já existe no banco, removendo da fila | tabela=${record.table} id=${record.id}`)
+                ok++
+                get().removeFromQueue(record.id)
+              } else {
+                fail++
+                console.error(`[sync] ERRO tabela=${record.table} id=${record.id} tentativa=${record.attempts + 1} | code=${error.code} msg=${error.message}`)
+                set(s => ({
+                  queue: s.queue.map(r =>
+                    r.id === record.id ? { ...r, attempts: r.attempts + 1 } : r
+                  ),
+                }))
+              }
             } else {
               ok++
               get().removeFromQueue(record.id)
