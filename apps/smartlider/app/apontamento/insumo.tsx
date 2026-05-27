@@ -88,16 +88,18 @@ export default function InsumoApontamentoScreen() {
       unidade: produto.unidade, area_aplicada: parseFloat(area) || null,
       status, observacao: obs, criado_por: user.user?.id,
     }
-    const { error } = await supabase.from('lider_apontamentos_insumo').insert(payload)
-    if (error) {
+    try {
+      const { error } = await supabase.from('lider_apontamentos_insumo').insert(payload)
+      if (error) throw error
+      await carregar()
+    } catch {
       addToQueue({ id, table: 'lider_apontamentos_insumo', action: 'insert', payload, created_at: new Date().toISOString() })
       setRecords(prev => [{ id, produto_nome: produto.nome, quantidade: parseFloat(quantidade), unidade: produto.unidade, status, created_at: new Date().toISOString(), sync_status: 'pending' }, ...prev])
       Alert.alert('Salvo offline', 'Será sincronizado quando a conexão voltar.')
-    } else {
-      await carregar()
+    } finally {
+      setSaving(false); setShowForm(false)
+      setProduto(null); setQtd(''); setArea(''); setObs(''); setStatus('enviado')
     }
-    setSaving(false); setShowForm(false)
-    setProduto(null); setQtd(''); setArea(''); setObs(''); setStatus('enviado')
   }
 
   return (

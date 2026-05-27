@@ -99,14 +99,18 @@ export default function ControleEpiScreen() {
       colaborador_id: colab.id, epi_id: epi.id, motivo, validade: validade || null,
       status, foto_url, observacao: obs, criado_por: user.user?.id,
     }
-    const { error } = await supabase.from('lider_controle_epi').insert(payload)
-    if (error) {
+    try {
+      const { error } = await supabase.from('lider_controle_epi').insert(payload)
+      if (error) throw error
+      await carregar()
+    } catch {
       addToQueue({ id, table: 'lider_controle_epi', action: 'insert', payload, created_at: new Date().toISOString() })
       setRecords(prev => [{ id, lider_colaboradores: { nome: colab.nome }, lider_epis: { nome: epi.nome }, status, motivo, created_at: new Date().toISOString(), sync_status: 'pending' }, ...prev])
       Alert.alert('Salvo offline', 'Sera sincronizado quando a conexao voltar.')
-    } else await carregar()
-    setSaving(false); setShowForm(false)
-    setColab(null); setEpi(null); setMotivo(MOTIVO_OPTS[0]); setValidade(''); setFotoUri(null); setObs(''); setStatus('entregue')
+    } finally {
+      setSaving(false); setShowForm(false)
+      setColab(null); setEpi(null); setMotivo(MOTIVO_OPTS[0]); setValidade(''); setFotoUri(null); setObs(''); setStatus('entregue')
+    }
   }
 
   return (

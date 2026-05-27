@@ -103,14 +103,18 @@ export default function AfericaoScreen() {
       volume_calda_lha: tipoAf === 'liquido' ? Math.round(volume_calda_lha) : null,
       status, observacao: obs || null,
     }
-    const { error } = await supabase.from('lider_afericoes').insert(payload)
-    if (error) {
+    try {
+      const { error } = await supabase.from('lider_afericoes').insert(payload)
+      if (error) throw error
+      await carregar()
+    } catch {
       addToQueue({ id, table: 'lider_afericoes', action: 'insert', payload, created_at: new Date().toISOString() })
       setRecords(prev => [{ id, maquina_nome: maq.nome, implemento_nome: impl?.nome, tipo_afericao: tipoAf, lider_maquinas: { nome: maq.nome }, lider_implementos: impl ? { nome: impl.nome } : null, vazao_medida_lmin: parseFloat(vazao), volume_calda_lha: tipoAf === 'liquido' ? Math.round(calcVolume(vazao, veloc, largura)) : null, status, created_at: new Date().toISOString(), sync_status: 'pending' }, ...prev])
       Alert.alert('Salvo offline', 'Sera sincronizado quando a conexao voltar.')
-    } else await carregar()
-    setSaving(false); setShowForm(false)
-    setMaq(null); setImpl(null); setVazao(''); setVeloc(''); setLargura(''); setObs(''); setStatus('pendente'); setDoseKg(''); setTipoAf('liquido')
+    } finally {
+      setSaving(false); setShowForm(false)
+      setMaq(null); setImpl(null); setVazao(''); setVeloc(''); setLargura(''); setObs(''); setStatus('pendente'); setDoseKg(''); setTipoAf('liquido')
+    }
   }
 
   const volPreview = tipoAf === 'liquido' ? calcVolume(vazao, veloc, largura) : 0

@@ -130,17 +130,19 @@ export default function MaoDeObraScreen() {
         observacao:        ausente ? (ausentes[c.id] || null) : null,
       }
     })
-    const { error } = await supabase.from('lider_mao_obra').insert(payloads)
-    if (error) {
+    try {
+      const { error } = await supabase.from('lider_mao_obra').insert(payloads)
+      if (error) throw error
+      await carregar()
+    } catch {
       payloads.forEach(payload =>
         addToQueue({ id: payload.id, table: 'lider_mao_obra', action: 'insert', payload, created_at: new Date().toISOString() })
       )
       setRecords(payloads.map(p => ({ ...p, sync_status: 'pending' })))
       Alert.alert('Salvo offline', `${payloads.length} registros serão sincronizados quando a conexão voltar.`)
-    } else {
-      await carregar()
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
   }
 
   // ── Registrar falta individual (histórico) ───────────────────
@@ -167,18 +169,20 @@ export default function MaoDeObraScreen() {
       presente: false, hora_entrada: null, hora_saida: null, horas_trabalhadas: 0,
       observacao: observacao || null,
     }
-    const { error } = await supabase.from('lider_mao_obra').insert(payload)
-    if (error) {
+    try {
+      const { error } = await supabase.from('lider_mao_obra').insert(payload)
+      if (error) throw error
+      await carregar()
+    } catch {
       addToQueue({ id, table: 'lider_mao_obra', action: 'insert', payload, created_at: new Date().toISOString() })
       setRecords(prev => [{ ...payload, sync_status: 'pending' }, ...prev])
       Alert.alert('Salvo offline', 'Será sincronizado quando a conexão voltar.')
-    } else {
-      await carregar()
+    } finally {
+      Vibration.vibrate(50)
+      setAddSaving(false)
+      setShowAddModal(false)
+      setAddColab(null); setAddMotivoKey(''); setAddObs(''); setAddAnexoUri(null)
     }
-    Vibration.vibrate(50)
-    setAddSaving(false)
-    setShowAddModal(false)
-    setAddColab(null); setAddMotivoKey(''); setAddObs(''); setAddAnexoUri(null)
   }
 
   // ── Loading ──────────────────────────────────────────────────

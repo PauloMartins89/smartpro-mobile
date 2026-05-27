@@ -68,14 +68,18 @@ export default function ProdutividadeEquipeScreen() {
       eficiencia_pct: haMR ? Math.round((haRR / haMR) * 100) : null,
       observacao: obs, criado_por: user.user?.id,
     }
-    const { error } = await supabase.from('lider_produtividade_equipe').insert(payload)
-    if (error) {
+    try {
+      const { error } = await supabase.from('lider_produtividade_equipe').insert(payload)
+      if (error) throw error
+      await carregar()
+    } catch {
       addToQueue({ id, table: 'lider_produtividade_equipe', action: 'insert', payload, created_at: new Date().toISOString() })
       setRecords(prev => [{ ...payload, sync_status: 'pending' }, ...prev])
       Alert.alert('Salvo offline', 'Sera sincronizado quando a conexao voltar.')
-    } else await carregar()
-    setSaving(false); setShowForm(false)
-    setAtiv(''); setHaMeta(''); setHaReal(''); setObs('')
+    } finally {
+      setSaving(false); setShowForm(false)
+      setAtiv(''); setHaMeta(''); setHaReal(''); setObs('')
+    }
   }
 
   return (

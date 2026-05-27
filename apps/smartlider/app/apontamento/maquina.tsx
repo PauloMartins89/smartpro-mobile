@@ -75,14 +75,18 @@ export default function MaquinaScreen() {
       horimetro_fim: parseFloat(horFim) || null,
       atividade, status, observacao: obs, criado_por: user.user?.id,
     }
-    const { error } = await supabase.from('lider_apontamentos_maquina').upsert(payload, { onConflict: 'turno_id,maquina_id' })
-    if (error) {
+    try {
+      const { error } = await supabase.from('lider_apontamentos_maquina').upsert(payload, { onConflict: 'turno_id,maquina_id' })
+      if (error) throw error
+      await carregar()
+    } catch {
       addToQueue({ id, table: 'lider_apontamentos_maquina', action: 'insert', payload, created_at: new Date().toISOString() })
       setRecords(prev => [{ id, lider_maquinas: { nome: maq.nome, codigo: maq.codigo }, horimetro_inicio: parseFloat(horIni), horimetro_fim: parseFloat(horFim), atividade, status, sync_status: 'pending' }, ...prev])
       Alert.alert('Salvo offline', 'Sera sincronizado quando a conexao voltar.')
-    } else await carregar()
-    setSaving(false); setShowForm(false)
-    setMaq(null); setHorIni(''); setHorFim(''); setAtiv(''); setObs(''); setStatus('operando')
+    } finally {
+      setSaving(false); setShowForm(false)
+      setMaq(null); setHorIni(''); setHorFim(''); setAtiv(''); setObs(''); setStatus('operando')
+    }
   }
 
   return (

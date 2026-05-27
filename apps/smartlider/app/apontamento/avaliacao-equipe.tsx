@@ -82,15 +82,19 @@ export default function AvaliacaoEquipeScreen() {
       equipe_id: turnoAtivo.equipe_id, equipe_nome: turnoAtivo.equipe_nome,
       ...notas, nota_geral, comentario: obs,
     }
-    const { error } = await supabase.from('lider_avaliacoes_equipe').upsert(payload, { onConflict: 'turno_id,equipe_id' })
-    if (error) {
+    try {
+      const { error } = await supabase.from('lider_avaliacoes_equipe').upsert(payload, { onConflict: 'turno_id,equipe_id' })
+      if (error) throw error
+      await carregar()
+    } catch {
       addToQueue({ id, table: 'lider_avaliacoes_equipe', action: 'insert', payload, created_at: new Date().toISOString() })
       setRecords(prev => [{ ...payload, sync_status: 'pending' }, ...prev])
       Alert.alert('Salvo offline', 'Sera sincronizado quando a conexao voltar.')
-    } else await carregar()
-    setSaving(false); setShowForm(false)
-    setNotas({ presenca: 5, produtividade: 5, qualidade: 5, seguranca: 5, uso_epi: 5, disciplina: 5 })
-    setObs('')
+    } finally {
+      setSaving(false); setShowForm(false)
+      setNotas({ presenca: 5, produtividade: 5, qualidade: 5, seguranca: 5, uso_epi: 5, disciplina: 5 })
+      setObs('')
+    }
   }
 
   function NotaStars({ nota }) {

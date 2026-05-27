@@ -75,14 +75,18 @@ export default function SolicitacaoInsumoScreen() {
       unidade: produto.unidade, urgencia, data_necessaria: dataNec || null,
       status: 'pendente', observacao: obs, criado_por: user.user?.id,
     }
-    const { error } = await supabase.from('lider_solicitacoes_insumo').insert(payload)
-    if (error) {
+    try {
+      const { error } = await supabase.from('lider_solicitacoes_insumo').insert(payload)
+      if (error) throw error
+      await carregar()
+    } catch {
       addToQueue({ id, table: 'lider_solicitacoes_insumo', action: 'insert', payload, created_at: new Date().toISOString() })
       setRecords(prev => [{ id, lider_produtos: { nome: produto.nome }, quantidade: parseFloat(qtd), unidade: produto.unidade, urgencia, status: 'pendente', created_at: new Date().toISOString(), sync_status: 'pending' }, ...prev])
       Alert.alert('Salvo offline', 'Sera sincronizado quando a conexao voltar.')
-    } else await carregar()
-    setSaving(false); setShowForm(false)
-    setProduto(null); setQtd(''); setDataNec(''); setObs(''); setUrgencia('media')
+    } finally {
+      setSaving(false); setShowForm(false)
+      setProduto(null); setQtd(''); setDataNec(''); setObs(''); setUrgencia('media')
+    }
   }
 
   return (

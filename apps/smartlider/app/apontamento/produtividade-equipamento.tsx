@@ -87,14 +87,18 @@ export default function ProdutividadeEquipamentoScreen() {
       produtividade_hah,
       observacao: obs || null,
     }
-    const { error } = await supabase.from('lider_produtividade_equipamento').upsert(payload, { onConflict: 'turno_id,maquina_id' })
-    if (error) {
+    try {
+      const { error } = await supabase.from('lider_produtividade_equipamento').upsert(payload, { onConflict: 'turno_id,maquina_id' })
+      if (error) throw error
+      await carregar()
+    } catch {
       addToQueue({ id, table: 'lider_produtividade_equipamento', action: 'insert', payload, created_at: new Date().toISOString() })
       setRecords(prev => [{ id, lider_maquinas: { nome: maq.nome }, maquina_nome: maq.nome, area_ha: parseFloat(areaHa)||0, horas_trabalhadas: parseFloat(horas)||null, produtividade_hah, sync_status: 'pending' }, ...prev])
       Alert.alert('Salvo offline', 'Sera sincronizado quando a conexao voltar.')
-    } else await carregar()
-    setSaving(false); setShowForm(false)
-    setMaq(null); setAtividade(''); setAreaHa(''); setQtdAplic(''); setUnidAplic(''); setHoras(''); setObs('')
+    } finally {
+      setSaving(false); setShowForm(false)
+      setMaq(null); setAtividade(''); setAreaHa(''); setQtdAplic(''); setUnidAplic(''); setHoras(''); setObs('')
+    }
   }
 
   const efPrev = (parseFloat(areaHa) && parseFloat(horas)) ? Math.round((parseFloat(areaHa) / parseFloat(horas)) * 100) / 100 : null

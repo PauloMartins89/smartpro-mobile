@@ -99,14 +99,18 @@ export default function SolicitacaoEpiScreen() {
       quantidade: parseInt(qtd) || 1, motivo, foto_url,
       status: 'pendente', observacao: obs, solicitado_por: user.user?.id,
     }
-    const { error } = await supabase.from('lider_solicitacoes_epi').insert(payload)
-    if (error) {
+    try {
+      const { error } = await supabase.from('lider_solicitacoes_epi').insert(payload)
+      if (error) throw error
+      await carregar()
+    } catch {
       addToQueue({ id, table: 'lider_solicitacoes_epi', action: 'insert', payload, created_at: new Date().toISOString() })
       setRecords(prev => [{ id, lider_colaboradores: { nome: colab.nome }, lider_epis: { nome: epi.nome }, quantidade: parseInt(qtd), motivo, status: 'pendente', created_at: new Date().toISOString(), sync_status: 'pending' }, ...prev])
       Alert.alert('Salvo offline', 'Sera sincronizado quando a conexao voltar.')
-    } else await carregar()
-    setSaving(false); setShowForm(false)
-    setColab(null); setEpi(null); setQtd('1'); setMotivo(MOTIVO_OPTS[0]); setFotoUri(null); setObs('')
+    } finally {
+      setSaving(false); setShowForm(false)
+      setColab(null); setEpi(null); setQtd('1'); setMotivo(MOTIVO_OPTS[0]); setFotoUri(null); setObs('')
+    }
   }
 
   return (
