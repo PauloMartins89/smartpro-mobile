@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, Clipboard } from 'react-native'
 import { Stack } from 'expo-router'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { supabase } from '../src/lib/supabase'
@@ -7,18 +7,35 @@ import { useRouter, useSegments } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import useLiderStore from '../src/store/useLiderStore'
 import type { LiderPerfil } from '../src/store/useLiderStore'
-import { initLogger } from '../src/lib/logger'
+import { initLogger, getLogs } from '../src/lib/logger'
 
 // Inicia captura de logs o mais cedo possível
 initLogger()
 
 // Error boundary global — captura crashes de render em qualquer rota
 export function ErrorBoundary({ error, retry }: { error: Error; retry: () => void }) {
+  const logs = getLogs().slice(0, 30)
+  const logText = logs.map(l => `[${l.time}][${l.level.toUpperCase()}] ${l.msg}`).join('\n')
+  const fullReport = `ERRO: ${error?.message || 'Erro desconhecido'}\n\nSTACK:\n${error?.stack || ''}\n\nLOGS:\n${logText}`
+
   return (
     <View style={eb.container}>
-      <Ionicons name="warning-outline" size={48} color="#F59E0B" style={{ marginBottom: 16 }} />
+      <Ionicons name="warning-outline" size={48} color="#F59E0B" style={{ marginBottom: 12 }} />
       <Text style={eb.title}>Algo deu errado</Text>
       <Text style={eb.msg}>{error?.message || 'Erro desconhecido'}</Text>
+
+      {/* Logs compactos para diagnóstico */}
+      <ScrollView style={eb.logBox} contentContainerStyle={{ paddingBottom: 8 }}>
+        {logs.map((l, i) => (
+          <Text key={i} style={[eb.logLine, l.level === 'error' ? eb.logError : l.level === 'warn' ? eb.logWarn : eb.logInfo]}>
+            [{l.time}] {l.msg}
+          </Text>
+        ))}
+      </ScrollView>
+
+      <TouchableOpacity style={eb.btnSecondary} onPress={() => Clipboard.setString(fullReport)}>
+        <Text style={eb.btnSecondaryText}>Copiar logs</Text>
+      </TouchableOpacity>
       <TouchableOpacity style={eb.btn} onPress={retry}>
         <Text style={eb.btnText}>Tentar novamente</Text>
       </TouchableOpacity>
@@ -26,11 +43,18 @@ export function ErrorBoundary({ error, retry }: { error: Error; retry: () => voi
   )
 }
 const eb = StyleSheet.create({
-  container:  { flex: 1, backgroundColor: '#0D1B2A', justifyContent: 'center', alignItems: 'center', padding: 32 },
-  title:      { color: '#fff', fontSize: 20, fontWeight: '700', marginBottom: 8 },
-  msg:        { color: '#94A3B8', fontSize: 13, textAlign: 'center', marginBottom: 32 },
-  btn:        { backgroundColor: '#22C55E', borderRadius: 12, paddingVertical: 14, paddingHorizontal: 32, width: '100%', alignItems: 'center' },
-  btnText:    { color: '#fff', fontSize: 15, fontWeight: '700' },
+  container:      { flex: 1, backgroundColor: '#0D1B2A', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  title:          { color: '#fff', fontSize: 20, fontWeight: '700', marginBottom: 6 },
+  msg:            { color: '#94A3B8', fontSize: 13, textAlign: 'center', marginBottom: 12 },
+  logBox:         { width: '100%', maxHeight: 200, backgroundColor: '#0A1220', borderRadius: 8, padding: 8, marginBottom: 12 },
+  logLine:        { fontFamily: 'monospace', fontSize: 10, marginBottom: 2 },
+  logInfo:        { color: '#64748B' },
+  logWarn:        { color: '#F59E0B' },
+  logError:       { color: '#EF4444' },
+  btn:            { backgroundColor: '#22C55E', borderRadius: 12, paddingVertical: 14, paddingHorizontal: 32, width: '100%', alignItems: 'center', marginTop: 4 },
+  btnText:        { color: '#fff', fontSize: 15, fontWeight: '700' },
+  btnSecondary:   { backgroundColor: '#1E293B', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 32, width: '100%', alignItems: 'center' },
+  btnSecondaryText: { color: '#94A3B8', fontSize: 14, fontWeight: '600' },
 })
 
 const GLOBAL_WS = '00000000-0000-0000-0000-000000000001'
@@ -123,6 +147,7 @@ export default function RootLayout() {
         <Stack.Screen name="solicitacao" options={{ headerShown: false }} />
         <Stack.Screen name="turno/novo"  options={{ presentation: 'modal', headerShown: false }} />
         <Stack.Screen name="fechamento"  options={{ headerShown: false }} />
+        <Stack.Screen name="diagnostico" options={{ headerShown: false }} />
       </Stack>
     </GestureHandlerRootView>
   )
