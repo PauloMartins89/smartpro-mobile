@@ -61,10 +61,11 @@ function Avatar({ nome, size = 46 }: { nome: string; size?: number }) {
 
 // ── Tela principal ───────────────────────────────────────────────────────────
 export default function SolicitarRefeicaoScreen() {
-  const nav         = useNavigation()
-  const router      = useRouter()
+  const nav          = useNavigation()
+  const router       = useRouter()
   const _turnoAtivo  = useLiderStore(s => s.turnoAtivo)
   const _workspaceId = useLiderStore(s => s.workspaceId)
+  const liderPerfil  = useLiderStore(s => s.liderPerfil)
   // DEV MOCK: permite visualizar tela sem turno ativo
   const turnoAtivo  = _turnoAtivo  ?? (__DEV__ ? { id: 'mock', lider_nome: 'Líder Demo', equipe_nome: 'EQUIPE IRRIG', equipe_codigo: 'EQ-F07' } as any : null)
   const workspaceId = _workspaceId ?? (__DEV__ ? 'd0261b4e-450a-47ce-a751-2ba9a12fe7d5' : '')
@@ -87,7 +88,7 @@ export default function SolicitarRefeicaoScreen() {
   // ── Carrega dados ────────────────────────────────────────────────────────
   useEffect(() => {
     nav.setOptions({ headerShown: false })
-    if (!turnoAtivo) { setLoading(false); return }
+    if (!turnoAtivo && !liderPerfil) { setLoading(false); return }
 
     async function load() {
       const [{ data: equipes }, { data: rests }] = await Promise.all([
@@ -103,11 +104,14 @@ export default function SolicitarRefeicaoScreen() {
       ])
 
       setRefeiEq(equipes || [])
-      // 1º tenta por cdc; 2º por equipe_id do turno; 3º única equipe do workspace
+      // 1º tenta por cdc/nome do turnoAtivo; 2º fallback pelo liderPerfil; 3º única equipe do workspace
       const matchedEq = equipes?.find(
         e => e.cdc === turnoAtivo?.equipe_nome ||
              e.cdc === turnoAtivo?.equipe_codigo ||
-             e.id  === turnoAtivo?.equipe_id
+             e.id  === turnoAtivo?.equipe_id ||
+             e.cdc === liderPerfil?.equipe_codigo ||
+             e.cdc === liderPerfil?.equipe_nome ||
+             e.id  === liderPerfil?.equipe_id
       )
       if (matchedEq) {
         setRefeiEqId(matchedEq.id)
@@ -226,7 +230,7 @@ export default function SolicitarRefeicaoScreen() {
           valor_cafe:           totais.vCafe,
           valor_total:          totais.total,
           observacoes:          observacoes || null,
-          lider_nome:           turnoAtivo.lider_nome,
+          lider_nome:           turnoAtivo?.lider_nome ?? liderPerfil?.nome ?? '',
           supervisor_telefone:  supervisorTelefone || null,
           token_lider:          uuidv4(),
           token_aprovacao:      uuidv4(),
@@ -236,11 +240,13 @@ export default function SolicitarRefeicaoScreen() {
 
       if (solErr) throw solErr
 
-      // Tenta vincular turno (silencioso se coluna nao existir)
-      supabase.from('refei_solicitacoes')
-        .update({ turno_id: turnoAtivo.id })
-        .eq('id', sol.id)
-        .then(() => {})
+      // Tenta vincular turno (silencioso se nao houver turno ativo)
+      if (turnoAtivo?.id) {
+        supabase.from('refei_solicitacoes')
+          .update({ turno_id: turnoAtivo.id })
+          .eq('id', sol.id)
+          .then(() => {})
+      }
 
       // Cria itens
       const itens = [
