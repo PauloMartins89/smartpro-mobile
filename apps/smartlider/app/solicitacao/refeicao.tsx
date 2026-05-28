@@ -129,10 +129,12 @@ export default function SolicitarRefeicaoScreen() {
 
   // ── Carrega colaboradores quando equipe muda ──────────────────────────────
   useEffect(() => {
-    if (!refeiEquipeId) { setColab([]); setMarcacoes({}); return }
-    supabase.from('refei_colaboradores')
+    // Usa equipe_id do liderPerfil (lider_equipes.id) para buscar em lider_colaboradores
+    const liderEquipeId = liderPerfil?.equipe_id ?? turnoAtivo?.equipe_id
+    if (!liderEquipeId) { setColab([]); setMarcacoes({}); return }
+    supabase.from('lider_colaboradores')
       .select('id, nome, cargo')
-      .eq('equipe_id', refeiEquipeId)
+      .eq('equipe_id', liderEquipeId)
       .eq('ativo', true)
       .order('nome')
       .then(({ data }) => {
@@ -142,7 +144,7 @@ export default function SolicitarRefeicaoScreen() {
         lista.forEach(c => { defaults[c.id] = { refeicao: true, cafe: false } })
         setMarcacoes(defaults)
       })
-  }, [refeiEquipeId])
+  }, [refeiEquipeId, liderPerfil?.equipe_id])
 
   // ── Toggles ──────────────────────────────────────────────────────────────
   function toggleItem(id, campo) {
