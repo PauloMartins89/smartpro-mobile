@@ -6,6 +6,7 @@ import { supabase } from '../src/lib/supabase'
 import { useRouter, useSegments } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import useLiderStore from '../src/store/useLiderStore'
+import type { LiderPerfil } from '../src/store/useLiderStore'
 import { initLogger } from '../src/lib/logger'
 
 // Inicia captura de logs o mais cedo possível
@@ -34,22 +35,44 @@ const eb = StyleSheet.create({
 
 const GLOBAL_WS = '00000000-0000-0000-0000-000000000001'
 
-async function fetchAndSetWorkspace(userId: string, setWorkspaceId: (id: string) => void) {
-  // Exclui o workspace global (seed) e pega o workspace real do usuário
+async function fetchAndSetLiderPerfil(userId: string, setLiderPerfil: (p: LiderPerfil | null) => void) {
   const { data } = await supabase
-    .from('workspace_members')
-    .select('workspace_id')
+    .from('lider_perfis')
+    .select(`
+      id, matricula, nome, workspace_id, equipe_id,
+      lider_equipes (
+        id, nome, codigo,
+        lider_frentes ( id, nome, codigo )
+      )
+    `)
     .eq('user_id', userId)
     .eq('ativo', true)
-    .neq('workspace_id', GLOBAL_WS)
-    .limit(1)
     .maybeSingle()
-  if (data?.workspace_id) setWorkspaceId(data.workspace_id)
+
+  if (!data) return
+
+  const eq  = (data as any).lider_equipes
+  const fr  = eq?.lider_frentes
+
+  const perfil: LiderPerfil = {
+    id:            data.id,
+    matricula:     data.matricula,
+    nome:          data.nome || '',
+    workspace_id:  data.workspace_id,
+    equipe_id:     eq?.id    ?? null,
+    equipe_nome:   eq?.nome  ?? null,
+    equipe_codigo: eq?.codigo ?? null,
+    frente_id:     fr?.id    ?? null,
+    frente_nome:   fr?.nome  ?? null,
+    frente_codigo: fr?.codigo ?? null,
+  }
+  setLiderPerfil(perfil)
 }
 
 export default function RootLayout() {
   const router          = useRouter()
   const segments        = useSegments()
+  const setLiderPerfil  = useLiderStore(s => s.setLiderPerfil)
   const setWorkspaceId  = useLiderStore(s => s.setWorkspaceId)
   const [ready, setReady] = useState(false)
 
@@ -63,7 +86,7 @@ export default function RootLayout() {
         console.log('[Boot] session:', !!session, '| inAuth:', inAuth)
         if (!session && !inAuth) { console.log('[Boot] -> login'); router.replace('/(auth)/login') }
         if (session  &&  inAuth) { console.log('[Boot] -> tabs');  router.replace('/(tabs)') }
-        if (session) fetchAndSetWorkspace(session.user.id, setWorkspaceId)
+        if (session) fetchAndSetLiderPerfil(session.user.id, setLiderPerfil)
       } catch (e: any) {
         console.error('[Boot] CRASH:', e?.message)
         router.replace('/(auth)/login')
@@ -78,7 +101,7 @@ export default function RootLayout() {
       const inAuth = segments[0] === '(auth)'
       if (!session && !inAuth) router.replace('/(auth)/login')
       if (session  &&  inAuth) router.replace('/(tabs)')
-      if (session) fetchAndSetWorkspace(session.user.id, setWorkspaceId)
+      if (session) fetchAndSetLiderPerfil(session.user.id, setLiderPerfil)
     })
     return () => subscription.unsubscribe()
   }, [])
