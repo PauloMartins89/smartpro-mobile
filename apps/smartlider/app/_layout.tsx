@@ -60,35 +60,49 @@ const eb = StyleSheet.create({
 const GLOBAL_WS = '00000000-0000-0000-0000-000000000001'
 
 async function fetchAndSetLiderPerfil(userId: string, setLiderPerfil: (p: LiderPerfil | null) => void) {
-  const { data } = await supabase
+  // 1. Busca perfil do líder (sem join — evita 406 por schema cache desatualizado)
+  const { data: p } = await supabase
     .from('lider_perfis')
-    .select(`
-      id, matricula, nome, workspace_id, equipe_id,
-      lider_equipes (
-        id, nome, codigo,
-        lider_frentes ( id, nome, codigo )
-      )
-    `)
+    .select('id, matricula, nome, workspace_id, equipe_id')
     .eq('user_id', userId)
     .eq('ativo', true)
     .maybeSingle()
 
-  if (!data) return
+  if (!p) return
 
-  const eq  = (data as any).lider_equipes
-  const fr  = eq?.lider_frentes
+  // 2. Busca equipe separadamente (se vinculada)
+  let eq: any = null
+  if (p.equipe_id) {
+    const { data } = await supabase
+      .from('lider_equipes')
+      .select('id, nome, codigo, frente_id')
+      .eq('id', p.equipe_id)
+      .maybeSingle()
+    eq = data
+  }
+
+  // 3. Busca frente separadamente (se a equipe tiver frente_id)
+  let fr: any = null
+  if (eq?.frente_id) {
+    const { data } = await supabase
+      .from('lider_frentes')
+      .select('id, nome, codigo')
+      .eq('id', eq.frente_id)
+      .maybeSingle()
+    fr = data
+  }
 
   const perfil: LiderPerfil = {
-    id:            data.id,
-    matricula:     data.matricula,
-    nome:          data.nome || '',
-    workspace_id:  data.workspace_id,
-    equipe_id:     eq?.id    ?? null,
-    equipe_nome:   eq?.nome  ?? null,
-    equipe_codigo: eq?.codigo ?? null,
-    frente_id:     fr?.id    ?? null,
-    frente_nome:   fr?.nome  ?? null,
-    frente_codigo: fr?.codigo ?? null,
+    id:            p.id,
+    matricula:     p.matricula,
+    nome:          p.nome || '',
+    workspace_id:  p.workspace_id,
+    equipe_id:     p.equipe_id     ?? null,
+    equipe_nome:   eq?.nome        ?? null,
+    equipe_codigo: eq?.codigo      ?? null,
+    frente_id:     fr?.id          ?? null,
+    frente_nome:   fr?.nome        ?? null,
+    frente_codigo: fr?.codigo      ?? null,
   }
   setLiderPerfil(perfil)
 }
