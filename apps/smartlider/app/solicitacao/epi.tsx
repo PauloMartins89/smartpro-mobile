@@ -111,6 +111,12 @@ export default function SolicitacaoEpiScreen() {
     try {
       const { error } = await supabase.from('lider_solicitacoes_epi').insert(payload)
       if (error) throw error
+      // Notifica supervisor via WhatsApp (fire-and-forget)
+      fetch('https://smartpro.app.br/api/notify-lider', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo: 'epi', id }),
+      }).catch(() => {})
       await carregar()
     } catch {
       addToQueue({ id, table: 'lider_solicitacoes_epi', action: 'insert', payload, created_at: new Date().toISOString() })
