@@ -5,6 +5,7 @@ import {
   TextInput, Alert, ActivityIndicator, Platform, Modal,
 } from 'react-native'
 import { useNavigation, useRouter } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../src/lib/supabase'
 import useLiderStore from '../../src/store/useLiderStore'
@@ -63,6 +64,7 @@ function Avatar({ nome, size = 46 }: { nome: string; size?: number }) {
 export default function SolicitarRefeicaoScreen() {
   const nav          = useNavigation()
   const router       = useRouter()
+  const insets       = useSafeAreaInsets()
   const _turnoAtivo  = useLiderStore(s => s.turnoAtivo)
   const _workspaceId = useLiderStore(s => s.workspaceId)
   const liderPerfil  = useLiderStore(s => s.liderPerfil)
@@ -716,7 +718,7 @@ export default function SolicitarRefeicaoScreen() {
       </Modal>
 
       {/* Footer fixo */}
-      <View style={st.footer}>
+      <View style={[st.footer, { paddingBottom: (Platform.OS === 'ios' ? 30 : 14) + insets.bottom }]}>
         <View style={st.kpiRow}>
           <View style={st.kpi}>
             <Text style={[st.kpiVal, { color: C.primary }]}>{totais.qtdRef}</Text>
