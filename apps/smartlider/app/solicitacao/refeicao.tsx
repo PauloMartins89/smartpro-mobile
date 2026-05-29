@@ -91,9 +91,22 @@ export default function SolicitarRefeicaoScreen() {
     if (!turnoAtivo && !liderPerfil) { setLoading(false); return }
 
     async function load() {
+      // 1) Resolve refei_equipe_id via FK em lider_equipes (vínculo SmartLíder → Refeições)
+      let refeiEqIdResolved: string | null = null
+      const liderEquipeId = liderPerfil?.equipe_id ?? turnoAtivo?.equipe_id
+      if (liderEquipeId) {
+        const { data: liderEq } = await supabase
+          .from('lider_equipes')
+          .select('refei_equipe_id')
+          .eq('id', liderEquipeId)
+          .maybeSingle()
+        refeiEqIdResolved = liderEq?.refei_equipe_id || null
+      }
+
+      // 2) Carrega equipes + restaurantes do workspace
       const [{ data: equipes }, { data: rests }] = await Promise.all([
         supabase.from('refei_equipes')
-          .select('id, cdc, nome, supervisor_telefone')
+          .select('id, cdc, nome, supervisor_telefone, supervisor_efetivo_id')
           .eq('workspace_id', workspaceId)
           .order('nome'),
         supabase.from('refei_restaurantes')
@@ -104,21 +117,33 @@ export default function SolicitarRefeicaoScreen() {
       ])
 
       setRefeiEq(equipes || [])
-      // 1º tenta por cdc/nome do turnoAtivo; 2º fallback pelo liderPerfil; 3º única equipe do workspace
-      const matchedEq = equipes?.find(
-        e => e.cdc === turnoAtivo?.equipe_nome ||
-             e.cdc === turnoAtivo?.equipe_codigo ||
-             e.id  === turnoAtivo?.equipe_id ||
-             e.cdc === liderPerfil?.equipe_codigo ||
-             e.cdc === liderPerfil?.equipe_nome ||
-             e.id  === liderPerfil?.equipe_id
-      )
+      // Prioridade: FK resolvida > match legado por cdc/nome > única equipe do workspace
+      let matchedEq = refeiEqIdResolved ? equipes?.find(e => e.id === refeiEqIdResolved) : null
+      if (!matchedEq) {
+        matchedEq = equipes?.find(
+          e => e.cdc === turnoAtivo?.equipe_nome ||
+               e.cdc === turnoAtivo?.equipe_codigo ||
+               e.id  === turnoAtivo?.equipe_id ||
+               e.cdc === liderPerfil?.equipe_codigo ||
+               e.cdc === liderPerfil?.equipe_nome ||
+               e.id  === liderPerfil?.equipe_id
+        )
+      }
+      if (!matchedEq && equipes && equipes.length === 1) matchedEq = equipes[0]
+
       if (matchedEq) {
         setRefeiEqId(matchedEq.id)
-        setSupervisorTelefone(matchedEq.supervisor_telefone || '')
-      } else if (equipes && equipes.length === 1) {
-        setRefeiEqId(equipes[0].id)
-        setSupervisorTelefone(equipes[0].supervisor_telefone || '')
+        // 3) Resolve telefone do supervisor: efetivo (preferencial) → supervisor_telefone (fallback)
+        let supTel = matchedEq.supervisor_telefone || ''
+        if (matchedEq.supervisor_efetivo_id) {
+          const { data: ef } = await supabase
+            .from('efetivo')
+            .select('celular')
+            .eq('id', matchedEq.supervisor_efetivo_id)
+            .maybeSingle()
+          if (ef?.celular) supTel = ef.celular
+        }
+        setSupervisorTelefone(supTel)
       }
       setRests(rests || [])
       if (rests && rests.length === 1) setRestId(rests[0].id)
@@ -128,22 +153,36 @@ export default function SolicitarRefeicaoScreen() {
   }, [])
 
   // ── Carrega colaboradores quando equipe muda ──────────────────────────────
+  // Usa refei_colaboradores (fonte unificada via efetivo). Fallback para
+  // lider_colaboradores quando a equipe ainda não tem cadastro em refeições.
   useEffect(() => {
-    // Usa equipe_id do liderPerfil (lider_equipes.id) para buscar em lider_colaboradores
     const liderEquipeId = liderPerfil?.equipe_id ?? turnoAtivo?.equipe_id
-    if (!liderEquipeId) { setColab([]); setMarcacoes({}); return }
-    supabase.from('lider_colaboradores')
-      .select('id, nome, cargo')
-      .eq('equipe_id', liderEquipeId)
-      .eq('ativo', true)
-      .order('nome')
-      .then(({ data }) => {
-        const lista = data || []
-        setColab(lista)
-        const defaults = {}
-        lista.forEach(c => { defaults[c.id] = { refeicao: true, cafe: false } })
-        setMarcacoes(defaults)
-      })
+    if (!refeiEquipeId && !liderEquipeId) { setColab([]); setMarcacoes({}); return }
+
+    async function loadColabs() {
+      let lista: any[] = []
+      if (refeiEquipeId) {
+        const { data } = await supabase.from('refei_colaboradores')
+          .select('id, nome, cargo, efetivo_id')
+          .eq('equipe_id', refeiEquipeId)
+          .eq('ativo', true)
+          .order('nome')
+        lista = data || []
+      }
+      if (lista.length === 0 && liderEquipeId) {
+        const { data } = await supabase.from('lider_colaboradores')
+          .select('id, nome, cargo')
+          .eq('equipe_id', liderEquipeId)
+          .eq('ativo', true)
+          .order('nome')
+        lista = data || []
+      }
+      setColab(lista)
+      const defaults = {}
+      lista.forEach(c => { defaults[c.id] = { refeicao: true, cafe: false } })
+      setMarcacoes(defaults)
+    }
+    loadColabs()
   }, [refeiEquipeId, liderPerfil?.equipe_id])
 
   // ── Toggles ──────────────────────────────────────────────────────────────
@@ -220,6 +259,7 @@ export default function SolicitarRefeicaoScreen() {
           workspace_id:         workspaceId,
           owner_id:             userId,
           lider_id:             userId,
+          lider_efetivo_id:     liderPerfil?.efetivo_id ?? null,
           equipe_id:            refeiEquipeId || null,
           restaurante_id:       restauranteId,
           data_refeicao:        dataRefeicao,
