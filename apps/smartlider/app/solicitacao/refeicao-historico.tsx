@@ -133,7 +133,7 @@ export default function RefeicaoHistoricoScreen() {
             .eq('lider_id', userId)
             .eq('status', 'pendente')
             .lte('disponivel_em', today)
-            .order('data_refeicao', { ascending: true })
+            .order('data_refeicao', { ascending: false })
             .limit(1)
             .maybeSingle()
           setAvalPend(aval || null)
