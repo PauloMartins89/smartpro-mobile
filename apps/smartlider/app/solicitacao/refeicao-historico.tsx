@@ -4,7 +4,7 @@ import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   ActivityIndicator, RefreshControl,
 } from 'react-native'
-import { useNavigation } from 'expo-router'
+import { useNavigation, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../src/lib/supabase'
 import useLiderStore from '../../src/store/useLiderStore'
@@ -71,6 +71,7 @@ function SolCard({ sol }) {
 
 export default function RefeicaoHistoricoScreen() {
   const nav         = useNavigation()
+  const router      = useRouter()
   const turnoAtivo  = useLiderStore(s => s.turnoAtivo)
   const workspaceId = useLiderStore(s => s.workspaceId)
 
@@ -78,6 +79,7 @@ export default function RefeicaoHistoricoScreen() {
   const [loading,      setLoading]   = useState(true)
   const [refreshing,   setRefreshing]= useState(false)
   const [filtro,       setFiltro]    = useState('todos')
+  const [avalPendente, setAvalPend]  = useState<any>(null)
 
   const filtros = [
     { key: 'todos',               label: 'Todas' },
@@ -117,6 +119,28 @@ export default function RefeicaoHistoricoScreen() {
     nav.setOptions({ title: 'Historico de Refeicoes' })
     carregar()
 
+    // Verifica avaliação de qualidade pendente
+    ;(async () => {
+      try {
+        const { data: userResp } = await supabase.auth.getUser()
+        const userId = userResp.user?.id
+        if (userId && workspaceId) {
+          const today = new Date().toISOString().slice(0, 10)
+          const { data: aval } = await supabase
+            .from('refei_avaliacoes')
+            .select('id, numero_pedido, restaurante_nome, data_refeicao')
+            .eq('workspace_id', workspaceId)
+            .eq('lider_id', userId)
+            .eq('status', 'pendente')
+            .lte('disponivel_em', today)
+            .order('data_refeicao', { ascending: true })
+            .limit(1)
+            .maybeSingle()
+          setAvalPend(aval || null)
+        }
+      } catch (_) {}
+    })()
+
     // Realtime: atualiza ao mudar status
     const channel = supabase
       .channel('refei-historico')
@@ -143,7 +167,33 @@ export default function RefeicaoHistoricoScreen() {
 
   return (
     <View style={st.root}>
-      {/* Filtros */}
+      {/* Banner de avaliação pendente */}
+      {avalPendente && (
+        <TouchableOpacity
+          style={st.avalBanner}
+          onPress={() => router.push({
+            pathname: '/solicitacao/avaliacao-refeicao',
+            params: {
+              id:          avalPendente.id,
+              numero:      avalPendente.numero_pedido   || '',
+              restaurante: avalPendente.restaurante_nome || '',
+              data:        avalPendente.data_refeicao   || '',
+              obrigatorio: '0',
+            },
+          })}
+          activeOpacity={0.85}>
+          <View style={st.avalBannerLeft}>
+            <Ionicons name="star-half-outline" size={20} color="#fff" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={st.avalBannerTitle}>Avaliação pendente</Text>
+            <Text style={st.avalBannerSub}>
+              {avalPendente.numero_pedido ? `Pedido ${avalPendente.numero_pedido} aguarda sua avaliação` : 'Avalie a refeição recebida'}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#fff" />
+        </TouchableOpacity>
+      )}
       <FlatList
         data={filtros}
         horizontal
@@ -213,4 +263,12 @@ const st = StyleSheet.create({
   motivo:          { fontSize: 12, color: C.red, fontWeight: '600' },
   empty:           { alignItems: 'center', paddingTop: 60, gap: 12 },
   emptyText:       { fontSize: 14, color: C.textMuted },
+
+  avalBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: '#F59E0B', paddingHorizontal: 14, paddingVertical: 12,
+  },
+  avalBannerLeft:  { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(0,0,0,0.15)', alignItems: 'center', justifyContent: 'center' },
+  avalBannerTitle: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  avalBannerSub:   { color: 'rgba(255,255,255,0.85)', fontSize: 12 },
 })

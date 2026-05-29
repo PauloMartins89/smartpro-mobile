@@ -84,6 +84,7 @@ export default function SolicitarRefeicaoScreen() {
   const [observacoes,          setObs]                = useState('')
   const [restModalVisible,      setRestModalVisible]   = useState(false)
   const [supervisorTelefone,    setSupervisorTelefone] = useState('')
+  const [liderTelefone,         setLiderTelefone]       = useState('')
 
   // ── Carrega dados ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -91,6 +92,38 @@ export default function SolicitarRefeicaoScreen() {
     if (!turnoAtivo && !liderPerfil) { setLoading(false); return }
 
     async function load() {
+      // 0) Verifica avaliação de qualidade pendente — bloqueia novo pedido se houver
+      try {
+        const { data: userResp } = await supabase.auth.getUser()
+        const userId = userResp.user?.id
+        if (userId && workspaceId) {
+          const today = new Date().toISOString().slice(0, 10)
+          const { data: aval } = await supabase
+            .from('refei_avaliacoes')
+            .select('id, numero_pedido, restaurante_nome, data_refeicao')
+            .eq('workspace_id', workspaceId)
+            .eq('lider_id', userId)
+            .eq('status', 'pendente')
+            .lte('disponivel_em', today)
+            .order('data_refeicao', { ascending: true })
+            .limit(1)
+            .maybeSingle()
+          if (aval) {
+            router.replace({
+              pathname: '/solicitacao/avaliacao-refeicao',
+              params: {
+                id:          aval.id,
+                numero:      aval.numero_pedido   || '',
+                restaurante: aval.restaurante_nome || '',
+                data:        aval.data_refeicao   || '',
+                obrigatorio: '1',
+              },
+            })
+            return
+          }
+        }
+      } catch (_) { /* silencioso — não bloqueia o fluxo */ }
+
       // 1) Resolve refei_equipe_id via FK em lider_equipes (vínculo SmartLíder → Refeições)
       let refeiEqIdResolved: string | null = null
       const liderEquipeId = liderPerfil?.equipe_id ?? turnoAtivo?.equipe_id
@@ -145,6 +178,18 @@ export default function SolicitarRefeicaoScreen() {
         }
         setSupervisorTelefone(supTel)
       }
+
+      // 4) Busca celular do líder via efetivo.matricula
+      if (liderPerfil?.matricula && workspaceId) {
+        const { data: ef } = await supabase
+          .from('efetivo')
+          .select('celular')
+          .eq('workspace_id', workspaceId)
+          .eq('matricula', liderPerfil.matricula)
+          .maybeSingle()
+        if (ef?.celular) setLiderTelefone(ef.celular)
+      }
+
       setRests(rests || [])
       if (rests && rests.length === 1) setRestId(rests[0].id)
       setLoading(false)
@@ -273,6 +318,7 @@ export default function SolicitarRefeicaoScreen() {
           valor_total:          totais.total,
           observacoes:          observacoes || null,
           lider_nome:           turnoAtivo?.lider_nome ?? liderPerfil?.nome ?? '',
+          lider_telefone:        liderTelefone || null,
           supervisor_telefone:  supervisorTelefone || null,
           token_lider:          uuidv4(),
           token_aprovacao:      uuidv4(),
