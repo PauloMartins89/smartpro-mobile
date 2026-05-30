@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- PREMIUM PREVIEW v2 -->
+<title>Preview – Mapas de Campo | SmartLíder</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0f1117;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 16px 64px;
+    gap: 48px;
+    min-height: 100vh;
+    color: #e8eaf0;
+  }
+
+  h1 { font-size: 22px; font-weight: 700; color: #4ade80; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: #6b7280; }
+
+  .screens-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 40px;
+    justify-content: center;
+    align-items: flex-start;
+  }
+
+  /* Phone frame */
+  .phone {
+    width: 360px;
+    background: #161b22;
+    border-radius: 36px;
+    border: 6px solid #2d3748;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.7);
+    overflow: hidden;
+    position: relative;
+  }
+  .phone-notch {
+    background: #161b22;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-bottom: 1px solid #2d3748;
+  }
+  .phone-notch span {
+    width: 80px;
+    height: 10px;
+    background: #2d3748;
+    border-radius: 5px;
+  }
+  .phone-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: #9ca3af;
+    margin-bottom: 8px;
+    text-align: center;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  /* ── App header ─────────────────────────────────────── */
+  .app-header {
+    background: #1a2234;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid #2d3748;
+  }
+  .app-header .back-icon {
+    font-size: 20px;
+    color: #4ade80;
+    cursor: pointer;
+  }
+  .app-header h2 {
+    font-size: 17px;
+    font-weight: 700;
+    color: #e8eaf0;
+  }
+
+  /* ── Mais tab ────────────────────────────────────────── */
+  .mais-screen { background: #0f1117; }
+  .mais-section-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #4b5563;
+    padding: 16px 16px 8px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .mais-item {
+    display: flex;
+    align-items: center;
+    padding: 14px 16px;
+    gap: 14px;
+    background: #161b22;
+    border-bottom: 1px solid #1f2937;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .mais-item:hover { background: #1f2937; }
+  .mais-item.highlight .item-icon { color: #4ade80 !important; }
+  .item-icon-wrap {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+  .item-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #e8eaf0;
+    flex: 1;
+  }
+  .item-chevron { font-size: 14px; color: #4b5563; }
+  .new-badge {
+    background: #4ade8022;
+    color: #4ade80;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid #4ade8044;
+  }
+
+  /* ── Tab bar ─────────────────────────────────────────── */
+  .tab-bar {
+    background: #1a2234;
+    border-top: 1px solid #2d3748;
+    display: flex;
+    padding: 8px 0 20px;
+    justify-content: space-around;
+  }
+  .tab-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    cursor: pointer;
+    padding: 4px 12px;
+    border-radius: 10px;
+  }
+  .tab-item.active .tab-icon { color: #4ade80; }
+  .tab-item.active .tab-label { color: #4ade80; }
+  .tab-icon { font-size: 20px; color: #4b5563; }
+  .tab-label { font-size: 10px; color: #4b5563; font-weight: 600; }
+
+  /* ── Mapa list screen ────────────────────────────────── */
+  .mapa-list { background: #0f1117; padding: 12px; }
+  .mapa-card {
+    background: #161b22;
+    border: 1px solid #2d3748;
+    border-radius: 14px;
+    padding: 14px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .mapa-card:hover { background: #1f2937; }
+  .mapa-icon-wrap {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+  .mapa-card-body { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+  .mapa-card-title { font-size: 15px; font-weight: 700; color: #e8eaf0; }
+  .mapa-card-sub { font-size: 13px; color: #6b7280; }
+  .mapa-card-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+  .tipo-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 6px;
+  }
+  .mapa-chevron { color: #4b5563; font-size: 16px; }
+  .meta-txt { font-size: 11px; color: #4b5563; }
+
+  /* ── Mapa viewer screen ──────────────────────────────── */
+  .mapa-viewer { background: #0f1117; position: relative; }
+  .mapa-viewport {
+    width: 100%;
+    height: 380px;
+    background: #111;
+    overflow: hidden;
+    position: relative;
+  }
+  .mapa-img-container {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #1a2a1a 0%, #1a3020 40%, #162820 100%);
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Simulated topo map lines */
+  .topo-lines {
+    position: absolute;
+    inset: 0;
+    opacity: 0.15;
+    background:
+      repeating-linear-gradient(0deg, transparent, transparent 18px, #4ade80 18px, #4ade80 19px),
+      repeating-linear-gradient(90deg, transparent, transparent 18px, #4ade80 18px, #4ade80 19px);
+  }
+  .topo-contour {
+    position: absolute;
+    border: 1.5px solid #4ade8044;
+    border-radius: 50%;
+  }
+
+  /* GPS dot */
+  .gps-dot-container {
+    position: absolute;
+    top: 45%;
+    left: 38%;
+    transform: translate(-50%, -50%);
+  }
+  .gps-accuracy-ring {
+    position: absolute;
+    width: 64px;
+    height: 64px;
+    background: rgba(59, 130, 246, 0.12);
+    border: 1.5px solid rgba(59, 130, 246, 0.4);
+    border-radius: 50%;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    animation: pulse-ring 2s ease-out infinite;
+  }
+  @keyframes pulse-ring {
+    0%   { transform: translate(-50%,-50%) scale(0.9); opacity: 0.8; }
+    50%  { transform: translate(-50%,-50%) scale(1.05); opacity: 0.4; }
+    100% { transform: translate(-50%,-50%) scale(0.9); opacity: 0.8; }
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.2; }
+  }
+  .gps-dot-outer {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    border: 2px solid #fff;
+    position: relative;
+    z-index: 2;
+  }
+  .gps-dot-inner {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #3b82f6;
+  }
+
+  /* Map label overlays */
+  .map-label {
+    position: absolute;
+    background: rgba(0,0,0,0.55);
+    color: #9ca3af;
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+  }
+
+  /* Info badge (coords) */
+  .info-badge {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: rgba(22, 27, 34, 0.92);
+    border: 1px solid #2d3748;
+    border-radius: 10px;
+    padding: 6px 10px;
+    z-index: 10;
+  }
+  .info-badge-row { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+  .info-badge-row:last-child { margin-bottom: 0; }
+  .info-badge-label { font-size: 10px; color: #6b7280; font-weight: 600; }
+  .info-badge-val { font-size: 10px; color: #e8eaf0; font-weight: 700; font-family: monospace; }
+
+  /* Controls overlay */
+  .map-controls {
+    position: absolute;
+    bottom: 20px;
+    right: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 10;
+    align-items: flex-end;
+  }
+  .zoom-group {
+    background: rgba(22, 27, 34, 0.95);
+    border: 1px solid #2d3748;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .zoom-btn {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    color: #e8eaf0;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .zoom-btn:hover { background: #2d3748; }
+  .zoom-sep { height: 1px; background: #2d3748; }
+  .gps-btn {
+    background: rgba(22, 27, 34, 0.95);
+    border: 1px solid #2d3748;
+    border-radius: 12px;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    cursor: pointer;
+    color: #4ade80;
+    box-shadow: 0 0 12px rgba(74, 222, 128, 0.3);
+    transition: all 0.15s;
+  }
+  .gps-btn:hover { background: #1f2937; }
+
+  /* Warning bar */
+  .warning-bar {
+    background: #f59e0b;
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  /* Bottom info strip */
+  .map-info-strip {
+    background: #1a2234;
+    border-top: 1px solid #2d3748;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .map-info-name { font-size: 13px; font-weight: 700; color: #e8eaf0; }
+  .map-info-tipo { font-size: 11px; color: #6b7280; }
+  .map-info-coords { font-size: 10px; color: #6b7280; font-family: monospace; }
+
+  /* Section label */
+  .screen-desc {
+    max-width: 360px;
+    text-align: center;
+  }
+  .screen-desc h3 { font-size: 15px; font-weight: 700; color: #e8eaf0; margin-bottom: 4px; }
+  .screen-desc p { font-size: 12px; color: #6b7280; line-height: 1.6; }
+
+  /* Feature list */
+  .features {
+    max-width: 760px;
+    width: 100%;
+    background: #161b22;
+    border: 1px solid #2d3748;
+    border-radius: 16px;
+    padding: 20px 24px;
+  }
+  .features h3 { font-size: 14px; font-weight: 700; color: #4ade80; margin-bottom: 14px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .feature-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  @media (max-width: 600px) { .feature-grid { grid-template-columns: 1fr; } }
+  .feature-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px;
+    border-radius: 8px;
+    background: #0f1117;
+  }
+  .feature-icon { font-size: 18px; flex-shrink: 0; }
+  .feature-text h4 { font-size: 13px; font-weight: 700; color: #e8eaf0; }
+  .feature-text p { font-size: 11px; color: #6b7280; margin-top: 2px; line-height: 1.5; }
+
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: #1a2234;
+    border: 1px solid #2d3748;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    color: #9ca3af;
+  }
+
+  .screen-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+</style>
+</head>
+<body>
+
+<div style="text-align:center; margin-bottom: 8px;">
+  <div style="font-size:11px;color:#4ade80;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">SmartLíder – Preview</div>
+  <h1>📍 Mapas de Campo</h1>
+  <p class="subtitle">Nova funcionalidade de navegação GPS com mapas GeoPDF</p>
+</div>
+
+<div class="screens-row">
+
+  <!-- Screen 1: Mais tab com novo item -->
+  <div class="screen-group">
+    <div class="phone-label">① Aba "Mais"</div>
+    <div class="phone">
+      <div class="phone-notch"><span></span></div>
+      <div class="mais-screen">
+        <div class="app-header">
+          <h2>Mais</h2>
+        </div>
+
+        <div class="mais-section-title">Ferramentas</div>
+
+        <!-- NOVO ITEM destacado -->
+        <div class="mais-item highlight" onclick="goToScreen(2)">
+          <div class="item-icon-wrap" style="background:#4ade8022;">
+            <span style="font-size:18px;color:#4ade80">🗺️</span>
+          </div>
+          <span class="item-label">Mapas de Campo</span>
+          <span class="new-badge">NOVO</span>
+          <span class="item-chevron">›</span>
+        </div>
+
+        <div class="mais-item">
+          <div class="item-icon-wrap" style="background:#3b82f622;">
+            <span style="font-size:18px;color:#3b82f6">📋</span>
+          </div>
+          <span class="item-label">Boletins / EPIs</span>
+          <span class="item-chevron">›</span>
+        </div>
+
+        <div class="mais-item">
+          <div class="item-icon-wrap" style="background:#8b5cf622;">
+            <span style="font-size:18px;color:#8b5cf6">📊</span>
+          </div>
+          <span class="item-label">Relatórios</span>
+          <span class="item-chevron">›</span>
+        </div>
+
+        <div class="mais-item">
+          <div class="item-icon-wrap" style="background:#f59e0b22;">
+            <span style="font-size:18px;color:#f59e0b">⚙️</span>
+          </div>
+          <span class="item-label">Configurações</span>
+          <span class="item-chevron">›</span>
+        </div>
+
+        <div class="mais-section-title">Conta</div>
+
+        <div class="mais-item">
+          <div class="item-icon-wrap" style="background:#ef444422;">
+            <span style="font-size:18px;color:#ef4444">🚪</span>
+          </div>
+          <span class="item-label">Sair</span>
+          <span class="item-chevron">›</span>
+        </div>
+      </div>
+
+      <div class="tab-bar">
+        <div class="tab-item"><div class="tab-icon">🏠</div><div class="tab-label">Início</div></div>
+        <div class="tab-item"><div class="tab-icon">👥</div><div class="tab-label">Efetivo</div></div>
+        <div class="tab-item"><div class="tab-icon">⊕</div><div class="tab-label"></div></div>
+        <div class="tab-item"><div class="tab-icon">📋</div><div class="tab-label">Turnos</div></div>
+        <div class="tab-item active"><div class="tab-icon">•••</div><div class="tab-label">Mais</div></div>
+      </div>
+    </div>
+    <div class="screen-desc">
+      <h3>Entrada pelo menu "Mais"</h3>
+      <p>Primeiro item da seção Ferramentas,<br>badge <strong style="color:#4ade80">NOVO</strong> para destacar a funcionalidade.</p>
+    </div>
+  </div>
+
+  <!-- Screen 2: Lista de mapas -->
+  <div class="screen-group" id="screen2">
+    <div class="phone-label">② Lista de Mapas</div>
+    <div class="phone">
+      <div class="phone-notch"><span></span></div>
+      <div>
+        <div class="app-header">
+          <span class="back-icon">‹</span>
+          <h2>Mapas</h2>
+        </div>
+        <div class="mapa-list">
+
+          <!-- Card 1 – Acesso -->
+          <div class="mapa-card" onclick="goToScreen(3)">
+            <div class="mapa-icon-wrap" style="background:#4ade8022; color:#4ade80;">🧭</div>
+            <div class="mapa-card-body">
+              <div class="mapa-card-title">Perdizes – Acesso</div>
+              <div class="mapa-card-sub">Rotas de entrada e saída do talhão</div>
+              <div class="mapa-card-meta">
+                <span class="tipo-badge" style="background:#4ade8020;color:#4ade80;">Acesso</span>
+                <span class="meta-txt">PERDIZES_ACESSO.pdf</span>
+              </div>
+            </div>
+            <span class="mapa-chevron">›</span>
+          </div>
+
+          <!-- Card 2 – Microplanejamento -->
+          <div class="mapa-card" onclick="goToScreen(3)">
+            <div class="mapa-icon-wrap" style="background:#e67e2222; color:#e67e22;">🗺️</div>
+            <div class="mapa-card-body">
+              <div class="mapa-card-title">Perdizes – Bloco 1 – Vias</div>
+              <div class="mapa-card-sub">Microplanejamento viário interno</div>
+              <div class="mapa-card-meta">
+                <span class="tipo-badge" style="background:#e67e2220;color:#e67e22;">Microplanejamento</span>
+                <span class="meta-txt">PERDIZES_VIAS_BLOCO1.pdf</span>
+              </div>
+            </div>
+            <span class="mapa-chevron">›</span>
+          </div>
+
+          <!-- Card 3 – Outro -->
+          <div class="mapa-card">
+            <div class="mapa-icon-wrap" style="background:#6b728022; color:#6b7280;">📄</div>
+            <div class="mapa-card-body">
+              <div class="mapa-card-title">Planta Geral – Fazenda</div>
+              <div class="mapa-card-sub"></div>
+              <div class="mapa-card-meta">
+                <span class="tipo-badge" style="background:#6b728020;color:#6b7280;">Outro</span>
+              </div>
+            </div>
+            <span class="mapa-chevron">›</span>
+          </div>
+
+        </div>
+      </div>
+    </div>
+    <div class="screen-desc">
+      <h3>Lista filtrada por workspace</h3>
+      <p>Busca somente mapas <strong>ativo=true</strong> do workspace atual.<br>
+         Cores e ícones por tipo: acesso / microplanejamento / outro.</p>
+    </div>
+  </div>
+
+  <!-- Screen 3: Viewer GPS -->
+  <div class="screen-group" id="screen3">
+    <div class="phone-label">③ Navegação GPS</div>
+    <div class="phone">
+      <div class="phone-notch"><span></span></div>
+
+      <!-- Header -->
+      <div class="app-header">
+        <span class="back-icon">‹</span>
+        <h2>Perdizes – Bloco 1</h2>
+      </div>
+
+      <!-- Map viewport -->
+      <div class="mapa-viewport">
+        <div class="mapa-img-container">
+          <!-- Topo lines simulation -->
+          <div class="topo-lines"></div>
+
+          <!-- Contour lines -->
+          <div class="topo-contour" style="width:200px;height:140px;top:60px;left:40px;transform:rotate(-10deg)"></div>
+          <div class="topo-contour" style="width:150px;height:100px;top:85px;left:65px;transform:rotate(-10deg)"></div>
+          <div class="topo-contour" style="width:100px;height:68px;top:106px;left:90px;transform:rotate(-10deg)"></div>
+          <div class="topo-contour" style="width:280px;height:200px;top:30px;left:10px;transform:rotate(5deg);border-color:#4ade8022"></div>
+
+          <!-- Road lines -->
+          <div style="position:absolute;top:0;left:80px;width:3px;height:100%;background:rgba(255,220,100,0.25);"></div>
+          <div style="position:absolute;top:0;left:160px;width:2px;height:100%;background:rgba(255,220,100,0.15);"></div>
+          <div style="position:absolute;top:120px;left:0;width:100%;height:2px;background:rgba(255,220,100,0.2);"></div>
+          <div style="position:absolute;top:240px;left:0;width:100%;height:2px;background:rgba(255,220,100,0.12);"></div>
+
+          <!-- Map labels -->
+          <div class="map-label" style="top:18px;left:90px;">T-04A</div>
+          <div class="map-label" style="top:180px;left:170px;">T-04B</div>
+          <div class="map-label" style="top:90px;left:18px;">EST.01</div>
+          <div class="map-label" style="top:260px;right:18px;">EST.02</div>
+
+          <!-- GPS dot with accuracy ring -->
+          <div class="gps-dot-container">
+            <div class="gps-accuracy-ring"></div>
+            <div class="gps-dot-outer">
+              <div class="gps-dot-inner"></div>
+            </div>
+          </div>
+
+          <!-- Info badge (coords) -->
+          <div class="info-badge">
+            <div class="info-badge-row">
+              <span class="info-badge-label">LAT</span>
+              <span class="info-badge-val">-19.8423°</span>
+            </div>
+            <div class="info-badge-row">
+              <span class="info-badge-label">LNG</span>
+              <span class="info-badge-val">-47.2198°</span>
+            </div>
+            <div class="info-badge-row">
+              <span class="info-badge-label">ACC</span>
+              <span class="info-badge-val">±8m</span>
+            </div>
+          </div>
+
+          <!-- Controls -->
+          <div class="map-controls">
+            <div class="zoom-group">
+              <div class="zoom-btn">+</div>
+              <div class="zoom-sep"></div>
+              <div class="zoom-btn">−</div>
+            </div>
+            <div class="gps-btn" title="GPS ativo">📍</div>
+            <div class="gps-btn" style="color:#ef4444;border-color:#ef4444;box-shadow:0 0 12px rgba(239,68,68,0.3);" title="Gravar trajeto">⏺</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom info strip -->
+      <div class="map-info-strip">
+        <div>
+          <div class="map-info-name">Perdizes – Bloco 1 – Vias</div>
+          <div class="map-info-tipo">Microplanejamento • WGS84</div>
+        </div>
+        <div class="map-info-coords">1.0×</div>
+      </div>
+    </div>
+    <div class="screen-desc">
+      <h3>Viewer com GPS ao vivo</h3>
+      <p>Ponto azul = posição atual · Anel = precisão GPS<br>
+         Scroll para pan · +/− para zoom · Botão 📍 liga/desliga rastreamento<br>
+         Botão ⏺ grava o trajeto em linha vermelha no mapa</p>
+    </div>
+  </div>
+
+  <!-- Screen 4: Gravando trajeto -->
+  <div class="screen-group">
+    <div class="phone-label">④ Gravando Trajeto</div>
+    <div class="phone">
+      <div class="phone-notch"><span></span></div>
+
+      <div class="app-header">
+        <span class="back-icon">‹</span>
+        <h2>Perdizes – Bloco 1</h2>
+      </div>
+
+      <div class="mapa-viewport">
+        <div class="mapa-img-container">
+          <div class="topo-lines"></div>
+          <div class="topo-contour" style="width:200px;height:140px;top:60px;left:40px;transform:rotate(-10deg)"></div>
+          <div class="topo-contour" style="width:150px;height:100px;top:85px;left:65px;transform:rotate(-10deg)"></div>
+
+          <!-- Trajectory line (simulated with SVG-like divs) -->
+          <svg style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none" viewBox="0 0 348 380">
+            <polyline points="60,300 80,270 110,240 130,200 160,170 168,140" stroke="#ef4444" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.88"/>
+            <!-- Dots at each recorded point -->
+            <circle cx="60" cy="300" r="3" fill="#ef4444" opacity="0.7"/>
+            <circle cx="80" cy="270" r="3" fill="#ef4444" opacity="0.7"/>
+            <circle cx="110" cy="240" r="3" fill="#ef4444" opacity="0.7"/>
+            <circle cx="130" cy="200" r="3" fill="#ef4444" opacity="0.7"/>
+            <circle cx="160" cy="170" r="3" fill="#ef4444" opacity="0.7"/>
+          </svg>
+
+          <!-- GPS dot at current position (end of trajectory) -->
+          <div style="position:absolute;top:126px;left:154px;transform:translate(-50%,-50%)">
+            <div class="gps-accuracy-ring" style="width:40px;height:40px;"></div>
+            <div class="gps-dot-outer"><div class="gps-dot-inner"></div></div>
+          </div>
+
+          <!-- Info badge -->
+          <div class="info-badge">
+            <div class="info-badge-row">
+              <span class="info-badge-label">LAT</span>
+              <span class="info-badge-val">-19.8423°</span>
+            </div>
+            <div class="info-badge-row">
+              <span class="info-badge-label">LNG</span>
+              <span class="info-badge-val">-47.2198°</span>
+            </div>
+            <div class="info-badge-row">
+              <span class="info-badge-label">ACC</span>
+              <span class="info-badge-val">±8m</span>
+            </div>
+          </div>
+
+          <!-- Controls -->
+          <div class="map-controls">
+            <div class="zoom-group">
+              <div class="zoom-btn">+</div>
+              <div class="zoom-sep"></div>
+              <div class="zoom-btn">−</div>
+            </div>
+            <div class="gps-btn" style="background:#4285f4;color:#fff;">📍</div>
+            <!-- Stop button (recording active = red filled) -->
+            <div class="gps-btn" style="background:#ef4444;border-color:#ef4444;color:#fff;box-shadow:0 0 14px rgba(239,68,68,0.5);">⏹</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recording status bar -->
+      <div style="background:#1a1a1a;border-top:1px solid #ef444433;padding:8px 14px;display:flex;align-items:center;gap:10px;">
+        <div style="width:10px;height:10px;border-radius:50%;background:#ef4444;animation:blink 1s step-end infinite;flex-shrink:0"></div>
+        <span style="flex:1;color:#fff;font-size:13px;font-weight:700;font-family:monospace;">Gravando · 5 pontos · 148 m</span>
+        <span style="color:rgba(255,255,255,0.55);font-size:12px;font-family:monospace;">2min 14s</span>
+      </div>
+
+      <!-- Coordinate legend -->
+      <div class="map-info-strip">
+        <div>
+          <div class="map-info-name">Perdizes – Bloco 1 – Vias</div>
+          <div class="map-info-tipo">Microplanejamento • WGS84</div>
+        </div>
+        <div class="map-info-coords">1.0×</div>
+      </div>
+    </div>
+    <div class="screen-desc">
+      <h3>Trajeto em andamento</h3>
+      <p>Linha vermelha desenhada em tempo real.<br>
+         Barra inferior mostra pontos gravados + distância + tempo.<br>
+         ⏹ para e oferece salvar ou descartar.</p>
+    </div>
+  </div>
+
+  <!-- Screen 5: Fora do mapa (warning) -->
+  <div class="screen-group">
+    <div class="phone-label">⑤ Alerta – Fora da área</div>
+    <div class="phone">
+      <div class="phone-notch"><span></span></div>
+
+      <div class="app-header">
+        <span class="back-icon">‹</span>
+        <h2>Perdizes – Acesso</h2>
+      </div>
+
+      <!-- Warning bar -->
+      <div class="warning-bar">
+        ⚠️ &nbsp;Você está fora da área deste mapa
+      </div>
+
+      <div class="mapa-viewport" style="height:330px;">
+        <div class="mapa-img-container" style="height:330px;">
+          <div class="topo-lines"></div>
+          <div class="topo-contour" style="width:180px;height:120px;top:80px;left:60px;"></div>
+          <div class="topo-contour" style="width:120px;height:80px;top:100px;left:90px;"></div>
+          <div class="map-label" style="top:18px;left:90px;">T-01A</div>
+          <div class="map-label" style="top:180px;left:50px;">ACESSO SUL</div>
+
+          <!-- Info badge -->
+          <div class="info-badge">
+            <div class="info-badge-row">
+              <span class="info-badge-label">LAT</span>
+              <span class="info-badge-val">-20.1254°</span>
+            </div>
+            <div class="info-badge-row">
+              <span class="info-badge-label">LNG</span>
+              <span class="info-badge-val">-47.6871°</span>
+            </div>
+            <div class="info-badge-row">
+              <span class="info-badge-label">ACC</span>
+              <span class="info-badge-val">±12m</span>
+            </div>
+          </div>
+
+          <!-- Controls -->
+          <div class="map-controls">
+            <div class="zoom-group">
+              <div class="zoom-btn">+</div>
+              <div class="zoom-sep"></div>
+              <div class="zoom-btn">−</div>
+            </div>
+            <div class="gps-btn" style="color:#4ade80;">📍</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="map-info-strip">
+        <div>
+          <div class="map-info-name">Perdizes – Acesso</div>
+          <div class="map-info-tipo">Acesso • WGS84</div>
+        </div>
+        <div class="map-info-coords">1.5×</div>
+      </div>
+    </div>
+    <div class="screen-desc">
+      <h3>Aviso de área</h3>
+      <p>Barra laranja aparece quando o GPS detecta<br>que o usuário saiu dos limites do mapa (bbox).</p>
+    </div>
+  </div>
+
+</div>
+
+<!-- Features summary -->
+<div class="features">
+  <h3>🗺️ Funcionalidades implementadas</h3>
+  <div class="feature-grid">
+    <div class="feature-item">
+      <div class="feature-icon">📍</div>
+      <div class="feature-text">
+        <h4>GPS ao vivo</h4>
+        <p>watchPositionAsync com Accuracy.BestForNavigation, atualiza a cada 2s ou 2m de deslocamento</p>
+      </div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon">🎯</div>
+      <div class="feature-text">
+        <h4>Círculo de precisão</h4>
+        <p>Anel azul proporcional à precisão GPS em metros, convertido para pixels com base no bbox do mapa</p>
+      </div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon">🔍</div>
+      <div class="feature-text">
+        <h4>Zoom 0.5× – 4×</h4>
+        <p>Botões + / − flutuantes sobre o mapa. ScrollView nested para pan livre em X e Y</p>
+      </div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon">⚠️</div>
+      <div class="feature-text">
+        <h4>Detecção de área</h4>
+        <p>Aviso laranja quando GPS sai do bbox do mapa (sw_lat/sw_lng/ne_lat/ne_lng)</p>
+      </div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon">⏺</div>
+      <div class="feature-text">
+        <h4>Gravação de trajeto</h4>
+        <p>Linha vermelha desenhada em tempo real. Mostra pontos, distância (Haversine) e duração. Salva em <code>lider_trajetos</code></p>
+      </div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon">🗄️</div>
+      <div class="feature-text">
+        <h4>GeoPDF → Supabase</h4>
+        <p>Script Python extrai GPTS do PDF (ArcGIS/Avenza), converte para PNG e sobe na tabela lider_mapas</p>
+      </div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon">📐</div>
+      <div class="feature-text">
+        <h4>Sem dependências extras</h4>
+        <p>Linha desenhada com Views rotacionados (center-midpoint + atan2). Sem react-native-svg, sem WebView</p>
+      </div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon">🔒</div>
+      <div class="feature-text">
+        <h4>Multi-workspace</h4>
+        <p>Mapas e trajetos vinculados ao workspace_id. RLS garante isolamento total por site</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Next steps -->
+<div style="max-width:760px;width:100%;background:#161b22;border:1px solid #2d3748;border-radius:16px;padding:20px 24px;">
+  <h3 style="font-size:14px;font-weight:700;color:#f59e0b;margin-bottom:14px;text-transform:uppercase;letter-spacing:0.5px;">⏭️ Próximos passos para colocar em produção</h3>
+  <div style="display:flex;flex-direction:column;gap:10px;">
+    <div style="display:flex;gap:10px;align-items:flex-start;">
+      <span style="color:#4ade80;font-size:15px;flex-shrink:0;">①</span>
+      <div>
+        <div style="font-size:13px;font-weight:700;color:#e8eaf0;">Rodar migration no Supabase</div>
+        <div style="font-size:12px;color:#6b7280;">SQL Editor → colar conteúdo de <code style="color:#4ade80">supabase/migrations/add_lider_mapas.sql</code></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:flex-start;">
+      <span style="color:#4ade80;font-size:15px;flex-shrink:0;">②</span>
+      <div>
+        <div style="font-size:13px;font-weight:700;color:#e8eaf0;">Criar bucket de Storage</div>
+        <div style="font-size:12px;color:#6b7280;">Supabase Storage → New bucket → nome: <code style="color:#4ade80">mapas-lider</code> → Public ON</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:flex-start;">
+      <span style="color:#4ade80;font-size:15px;flex-shrink:0;">③</span>
+      <div>
+        <div style="font-size:13px;font-weight:700;color:#e8eaf0;">Processar os PDFs</div>
+        <div style="font-size:12px;color:#6b7280;font-family:monospace;margin-top:4px;background:#0f1117;padding:8px;border-radius:6px;line-height:1.6">python scripts/geopdf_to_supabase.py "PERDIZES_VIAS_BLOCO1.pdf" \<br>
+  --workspace-id &lt;uuid&gt; --nome "Perdizes – Bloco 1" --tipo microplanejamento</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:flex-start;">
+      <span style="color:#4ade80;font-size:15px;flex-shrink:0;">④</span>
+      <div>
+        <div style="font-size:13px;font-weight:700;color:#e8eaf0;">Novo build EAS (obrigatório – expo-location é nativo)</div>
+        <div style="font-size:12px;color:#6b7280;font-family:monospace;margin-top:4px;background:#0f1117;padding:8px;border-radius:6px;line-height:1.6">cd "C:\smartpro-mobile\apps\smartlider"<br>
+git add -A ; git commit -m "feat: GPS map navigation"<br>
+npx eas build --platform android --profile preview</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+  <span class="tag">📱 Expo SDK 56</span>
+  <span class="tag">🗺️ expo-location</span>
+  <span class="tag">🛰️ WGS84 / GeoPDF</span>
+  <span class="tag">🐍 PyMuPDF</span>
+  <span class="tag">🗄️ Supabase Storage</span>
+  <span class="tag">🔒 RLS por workspace</span>
+</div>
+
+<script>
+function goToScreen(n) {
+  const el = document.getElementById('screen' + n)
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
+</script>
+</body>
+</html>

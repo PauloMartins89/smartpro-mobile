@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { View, Text, StyleSheet, ScrollView, FlatList, TouchableOpacity, TextInput, Alert, ActivityIndicator, Modal } from 'react-native'
 import { useNavigation } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../src/lib/supabase'
 import useLiderStore from '../../src/store/useLiderStore'
@@ -23,6 +24,7 @@ const PRODS_SOLID = ['Adubo','Calcario','Graos','Fertilizante','Outro']
 
 export default function AfericaoScreen() {
   const nav         = useNavigation()
+  const insets      = useSafeAreaInsets()
   const turnoAtivo  = useLiderStore(s => s.turnoAtivo)
   const workspaceId = useLiderStore(s => s.workspaceId)
   const addToQueue  = useSyncStore(s => s.addToQueue)
@@ -172,7 +174,7 @@ export default function AfericaoScreen() {
       )}
 
       <Modal visible={showForm} animationType="slide" transparent>
-        <View style={s.overlay}>
+        <View style={[s.overlay, { paddingBottom: insets.bottom }]}>
           <View style={s.modal}>
             <View style={s.modalHdr}>
               <Text style={s.modalTitle}>Nova Afericao</Text>

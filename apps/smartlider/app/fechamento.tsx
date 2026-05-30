@@ -5,6 +5,7 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../src/lib/supabase'
 import useLiderStore from '../src/store/useLiderStore'
 import { C, fmtDate, TURNO_LABEL } from '../src/lib/theme'
@@ -22,6 +23,7 @@ interface Resumo {
 
 export default function FechamentoScreen() {
   const router      = useRouter()
+  const insets      = useSafeAreaInsets()
   const turnoAtivo  = useLiderStore(s => s.turnoAtivo)
   const setTurno    = useLiderStore(s => s.setTurnoAtivo)
   const [resumo,   setResumo]  = useState<Resumo | null>(null)
@@ -139,7 +141,7 @@ export default function FechamentoScreen() {
       </ScrollView>
 
       {/* Botão fechar */}
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: (Platform.OS === 'ios' ? 30 : 14) + insets.bottom }]}>
         <TouchableOpacity style={styles.btn} onPress={handleFechar} disabled={fechando} activeOpacity={0.85}>
           {fechando
             ? <ActivityIndicator color="#fff" />

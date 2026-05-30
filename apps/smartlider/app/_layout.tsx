@@ -73,11 +73,12 @@ async function fetchAndSetLiderPerfil(userId: string, setLiderPerfil: (p: LiderP
   // 2. Busca equipe separadamente (se vinculada)
   let eq: any = null
   if (p.equipe_id) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('lider_equipes')
       .select('id, nome, codigo, frente_id')
       .eq('id', p.equipe_id)
       .maybeSingle()
+    console.log('[Perfil] equipe query:', JSON.stringify({ data, error }))
     eq = data
   }
 

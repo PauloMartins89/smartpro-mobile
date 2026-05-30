@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  Platform, RefreshControl, ActivityIndicator,
+  RefreshControl, ActivityIndicator,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
@@ -150,7 +150,7 @@ export default function DashboardScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={{ height: 24 }} />
+      <View style={{ height: 20 }} />
     </ScrollView>
   )
 }

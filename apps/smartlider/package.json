@@ -15,9 +15,12 @@
     "expo-build-properties": "^56.0.14",
     "expo-camera": "^56.0.7",
     "expo-constants": "~56.0.15",
+    "expo-file-system": "~56.0.7",
     "expo-font": "~56.0.5",
     "expo-image-picker": "^56.0.13",
     "expo-linking": "~56.0.11",
+    "expo-location": "~56.0.15",
+    "expo-network": "~56.0.4",
     "expo-router": "^56.2.6",
     "expo-secure-store": "^56.0.4",
     "expo-status-bar": "~56.0.4",
@@ -34,6 +37,7 @@
   "devDependencies": {
     "@types/react": "~19.2.2",
     "babel-preset-expo": "^56.0.12",
+    "sharp": "^0.34.5",
     "typescript": "~6.0.3"
   }
 }

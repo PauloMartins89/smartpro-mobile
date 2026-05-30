@@ -6,6 +6,7 @@ import useLiderStore from '../../src/store/useLiderStore'
 import { C } from '../../src/lib/theme'
 
 const ITEMS = [
+  { icon: 'map-outline',           label: 'Mapas de Campo',       route: '/mapa' },
   { icon: 'document-text-outline', label: 'Fechar Dia / Boletim', route: '/fechamento' },
   { icon: 'terminal-outline',      label: 'Diagnóstico / Logs',   route: '/diagnostico' },
 ]

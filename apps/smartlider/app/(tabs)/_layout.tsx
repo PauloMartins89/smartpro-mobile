@@ -2,6 +2,7 @@ import { Tabs, useRouter } from 'expo-router'
 import { View, Text, TouchableOpacity, StyleSheet, Platform, ActivityIndicator } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useEffect, useState } from 'react'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import useLiderStore from '../../src/store/useLiderStore'
 import { C, TURNO_LABEL } from '../../src/lib/theme'
 import RightDrawer from '../../src/components/RightDrawer'
@@ -13,6 +14,7 @@ export default function TabsLayout() {
   const triggerDashRefresh  = useLiderStore(s => s.triggerDashRefresh)
   const hasHydrated         = useLiderStore(s => s._hasHydrated)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const insets              = useSafeAreaInsets()
 
   // Auto-sync offline queue ao voltar ao foreground
   useSyncQueue()
@@ -35,7 +37,7 @@ export default function TabsLayout() {
   if (!turnoAtivo) return null
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, paddingBottom: insets.bottom }}>
       {/* Barra de contexto persistente */}
       <View style={styles.contextBar}>
         <View style={styles.contextLeft}>
@@ -86,14 +88,21 @@ export default function TabsLayout() {
           name="fab"
           options={{
             title: '',
-            tabBarIcon: () => (
-              <View style={styles.fab}>
-                <Ionicons name="add" size={30} color="#fff" />
-              </View>
-            ),
             tabBarLabel: () => null,
+            tabBarButton: () => (
+              <TouchableOpacity
+                style={styles.fabWrap}
+                onPress={() => router.push('/apontamento')}
+                onLongPress={() => router.push('/mapa/importar')}
+                delayLongPress={500}
+                activeOpacity={0.85}
+              >
+                <View style={styles.fab}>
+                  <Ionicons name="add" size={30} color="#fff" />
+                </View>
+              </TouchableOpacity>
+            ),
           }}
-          listeners={{ tabPress: e => { e.preventDefault(); router.push('/apontamento/index') } }}
         />
         <Tabs.Screen
           name="solicitacoes"
@@ -132,5 +141,6 @@ const styles = StyleSheet.create({
   contextBtn:      { alignItems: 'center', justifyContent: 'center', gap: 3 },
   contextBtnLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 9.5, fontWeight: '600' },
   tabBar:         { backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: C.border, paddingBottom: Platform.OS === 'ios' ? 20 : 6, height: Platform.OS === 'ios' ? 82 : 64 },
+  fabWrap:        { flex: 1, alignItems: 'center', justifyContent: 'center' },
   fab:            { width: 56, height: 56, borderRadius: 28, backgroundColor: C.primary, justifyContent: 'center', alignItems: 'center', marginBottom: Platform.OS === 'ios' ? 20 : 12, shadowColor: C.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 8 },
 })

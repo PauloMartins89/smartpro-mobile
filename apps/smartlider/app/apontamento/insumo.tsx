@@ -5,6 +5,7 @@ import {
   TouchableOpacity, TextInput, Alert, ActivityIndicator, Modal,
 } from 'react-native'
 import { useNavigation, useRouter } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../src/lib/supabase'
 import useLiderStore from '../../src/store/useLiderStore'
@@ -25,6 +26,7 @@ interface Produto { id: string; nome: string; unidade: string }
 
 export default function InsumoApontamentoScreen() {
   const nav         = useNavigation()
+  const insets      = useSafeAreaInsets()
   const router      = useRouter()
   const turnoAtivo  = useLiderStore(s => s.turnoAtivo)
   const workspaceId = useLiderStore(s => s.workspaceId)
@@ -149,7 +151,7 @@ export default function InsumoApontamentoScreen() {
       )}
 
       <Modal visible={showForm} animationType="slide" transparent>
-        <View style={s.overlay}>
+        <View style={[s.overlay, { paddingBottom: insets.bottom }]}>
           <View style={s.modal}>
             <View style={s.modalHdr}>
               <Text style={s.modalTitle}>Novo Apontamento de Insumo</Text>

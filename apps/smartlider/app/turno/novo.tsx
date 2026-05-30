@@ -4,6 +4,7 @@ import {
   ActivityIndicator, Alert, Platform,
 } from 'react-native'
 import { useRouter } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../src/lib/supabase'
 import useLiderStore, { type Turno } from '../../src/store/useLiderStore'
@@ -25,6 +26,7 @@ const TURNOS: { id: Turno; label: string; icon: string; color: string }[] = [
 
 export default function IniciarTurnoScreen() {
   const router         = useRouter()
+  const insets         = useSafeAreaInsets()
   const liderPerfil    = useLiderStore(s => s.liderPerfil)
   const setTurnoAtivo  = useLiderStore(s => s.setTurnoAtivo)
 
@@ -216,7 +218,7 @@ export default function IniciarTurnoScreen() {
         <View style={{ height: 120 }} />
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: (Platform.OS === 'ios' ? 34 : 16) + insets.bottom }]}>
         <TouchableOpacity style={styles.btn} onPress={handleIniciar} disabled={loading} activeOpacity={0.85}>
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>▶  Iniciar Turno</Text>}
         </TouchableOpacity>

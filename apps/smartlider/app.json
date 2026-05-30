@@ -21,16 +21,30 @@
       },
       "permissions": [
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
       ]
     },
     "plugins": [
       "expo-router",
       "expo-font",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permite selecionar imagens para importar mapas de campo."
+        }
+      ],
+      [
         "expo-camera",
         {
           "cameraPermission": "Permite tirar fotos de apontamentos"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Permite mostrar sua posição nos mapas de campo."
         }
       ],
       [

@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartLíder · Premium Viewer</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#0e0e14;display:flex;justify-content:center;align-items:flex-start;
+     min-height:100vh;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;
+     padding:32px 16px 80px;}
+.scene{display:flex;gap:36px;flex-wrap:wrap;justify-content:center;align-items:flex-start;}
+.col{display:flex;flex-direction:column;align-items:center;gap:12px;}
+.lbl{color:rgba(255,255,255,.35);font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;}
+
+/* ─── Phone frame ─── */
+.phone{width:360px;height:700px;background:#090a0f;border-radius:46px;position:relative;
+       box-shadow:0 0 0 1px rgba(255,255,255,.07),0 40px 80px rgba(0,0,0,.8);overflow:hidden;
+       transition:border-radius .35s cubic-bezier(.4,0,.2,1);}
+.phone.fs{border-radius:0;}
+
+/* status bar */
+.sb{height:44px;display:flex;align-items:center;justify-content:space-between;
+    padding:0 22px;font-size:12px;font-weight:600;color:rgba(255,255,255,.55);
+    position:relative;z-index:40;transition:height .35s,opacity .35s;}
+.phone.fs .sb{height:0;overflow:hidden;opacity:0;}
+
+/* nav header */
+.nh{height:50px;background:rgba(14,22,38,.97);display:flex;align-items:center;
+    padding:0 14px;gap:10px;border-bottom:1px solid rgba(255,255,255,.05);
+    position:relative;z-index:40;transition:height .35s,opacity .35s;}
+.phone.fs .nh{height:0;overflow:hidden;opacity:0;}
+.nh-back{color:rgba(255,255,255,.7);font-size:24px;line-height:1;cursor:pointer;}
+.nh-title{color:#fff;font-size:16px;font-weight:700;letter-spacing:-.01em;}
+
+/* map canvas */
+.map{position:absolute;inset:0;top:94px;
+     background:linear-gradient(155deg,#102010 0%,#0a1c0a 40%,#182818 70%,#0d1d0d 100%);
+     transition:top .35s;}
+.phone.fs .map{top:0;}
+
+/* terrain SVG */
+.terrain{position:absolute;inset:0;pointer-events:none;}
+
+/* ─── GPS CHIP ─── */
+.gps-chip{position:absolute;left:14px;z-index:30;
+          display:none;align-items:center;gap:7px;
+          background:rgba(10,11,17,.9);
+          border-radius:24px;padding:7px 6px 7px 11px;
+          border:1px solid rgba(255,255,255,.09);
+          box-shadow:0 2px 12px rgba(0,0,0,.5);
+          font-size:11.5px;color:rgba(255,255,255,.9);font-weight:600;
+          font-variant-numeric:tabular-nums;white-space:nowrap;
+          transition:top .35s;}
+.gps-chip.vis{display:flex;}
+.phone.fs .gps-chip{top:58px!important;}
+.dot{width:8px;height:8px;border-radius:50%;background:#555;flex-shrink:0;}
+.dot.on{background:#4ade80;animation:dp 2s infinite;}
+@keyframes dp{0%,100%{box-shadow:0 0 0 0 rgba(74,222,128,.6);}50%{box-shadow:0 0 0 5px rgba(74,222,128,0);}}
+.acc-pill{background:rgba(255,255,255,.08);border-radius:10px;padding:2px 7px;
+          font-size:10px;color:rgba(255,255,255,.55);font-weight:700;margin-left:1px;}
+
+/* ─── TOOLBAR ─── */
+.toolbar{position:absolute;right:14px;bottom:88px;z-index:30;
+         display:flex;flex-direction:column;align-items:center;
+         background:rgba(10,11,17,.93);border-radius:18px;overflow:hidden;
+         border:1px solid rgba(255,255,255,.09);
+         box-shadow:0 8px 24px rgba(0,0,0,.6);}
+.tb{width:50px;height:50px;display:flex;align-items:center;justify-content:center;
+    cursor:pointer;color:rgba(255,255,255,.75);transition:background .12s;}
+.tb:hover{background:rgba(255,255,255,.07);}
+.tb.gps-on{background:#4285F4;color:#fff;}
+.tb.full-on{background:rgba(74,222,128,.13);color:#4ade80;}
+.td{width:24px;height:1px;background:rgba(255,255,255,.08);}
+svg.ic{display:block;}
+
+/* ─── RECORD PILLS ─── */
+.rpw{position:absolute;left:14px;bottom:88px;z-index:30;
+     display:none;flex-direction:row;gap:8px;align-items:flex-end;
+     transition:opacity .2s;}
+.rpw.vis{display:flex;}
+.pill{display:flex;align-items:center;gap:6px;
+      background:rgba(10,11,17,.93);border-radius:16px;padding:10px 13px;
+      border:1px solid rgba(255,255,255,.09);box-shadow:0 4px 12px rgba(0,0,0,.5);
+      font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;
+      color:rgba(156,163,175,1);transition:all .15s;}
+.pill:hover{filter:brightness(1.1);}
+.pill.poly{border-color:rgba(245,158,11,.35);color:#f59e0b;}
+.pill.rec{border-color:rgba(239,68,68,.35);color:#ef4444;}
+.pill.rec.on{background:#ef4444;border-color:#ef4444;color:#fff;}
+
+/* ─── GPS DOT ON MAP ─── */
+.gps-pos{position:absolute;transform:translate(-50%,-50%);z-index:20;display:none;}
+.gps-pos.vis{display:block;}
+.ring{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+      width:70px;height:70px;border-radius:50%;
+      background:rgba(66,133,244,.1);border:1px solid rgba(66,133,244,.35);
+      animation:rp 2.5s ease-in-out infinite;}
+@keyframes rp{0%,100%{transform:translate(-50%,-50%) scale(.9);opacity:.8;}
+              50%{transform:translate(-50%,-50%) scale(1.08);opacity:.35;}}
+.gdot{width:22px;height:22px;border-radius:50%;background:#fff;
+      display:flex;align-items:center;justify-content:center;
+      box-shadow:0 2px 8px rgba(0,0,0,.5);position:relative;z-index:2;}
+.ginner{width:12px;height:12px;border-radius:50%;background:#4285F4;}
+
+/* ─── TRAJETO LINES ─── */
+.tl{position:absolute;height:4px;border-radius:2px;opacity:.88;transform-origin:left center;}
+
+/* ─── REC BAR ─── */
+.recbar{position:absolute;bottom:0;left:0;right:0;z-index:35;
+        background:#0d0e13;border-top:1px solid rgba(239,68,68,.18);
+        padding:9px 14px;display:flex;align-items:center;gap:10px;
+        transform:translateY(100%);transition:transform .25s cubic-bezier(.4,0,.2,1);}
+.recbar.show{transform:translateY(0);}
+.recdot{width:10px;height:10px;border-radius:50%;background:#ef4444;
+        flex-shrink:0;animation:rb 1s steps(2) infinite;}
+@keyframes rb{0%{opacity:1;}50%{opacity:.2;}}
+.recmain{flex:1;}
+.reclabel{color:#fff;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;}
+.recsub{color:rgba(255,255,255,.4);font-size:11px;margin-top:2px;font-variant-numeric:tabular-nums;}
+.rectime{color:rgba(255,255,255,.4);font-size:12px;font-variant-numeric:tabular-nums;}
+
+/* ─── WARN BAR ─── */
+.warn{position:absolute;top:0;left:0;right:0;z-index:35;
+      background:#e67e22;display:flex;align-items:center;gap:7px;
+      padding:9px 14px;font-size:13px;font-weight:700;color:#fff;
+      opacity:0;transition:opacity .2s;}
+.warn.show{opacity:1;}
+
+/* ─── LEGEND ─── */
+.legend{position:absolute;bottom:0;left:0;right:0;z-index:10;
+        background:rgba(0,0,0,.45);padding:4px 10px;
+        font-size:9.5px;color:rgba(255,255,255,.35);font-variant-numeric:tabular-nums;}
+
+/* ─── ACTION MENU ─── */
+.overlay{position:absolute;inset:0;z-index:50;background:rgba(0,0,0,.55);
+         display:flex;flex-direction:column;justify-content:flex-end;
+         opacity:0;pointer-events:none;transition:opacity .22s;}
+.overlay.show{opacity:1;pointer-events:auto;}
+.sheet{background:#0d0f17;border-radius:22px 22px 0 0;padding-bottom:20px;
+       transform:translateY(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);}
+.overlay.show .sheet{transform:translateY(0);}
+.handle{width:38px;height:4px;background:#333;border-radius:2px;margin:10px auto 12px;}
+.mi{display:flex;align-items:center;gap:14px;padding:14px 20px;
+    border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer;transition:background .1s;}
+.mi:hover{background:rgba(255,255,255,.03);}
+.mi:last-child{border:none;}
+.mi-icon{font-size:19px;width:22px;text-align:center;}
+.mi-body{flex:1;}
+.mi-label{font-size:14.5px;font-weight:600;color:rgba(255,255,255,.88);}
+.mi-sub{font-size:11.5px;color:rgba(255,255,255,.35);margin-top:2px;}
+.mi-label.green{color:#4ade80;}
+.mi-chev{color:rgba(255,255,255,.2);font-size:14px;}
+
+/* ─── DEMO PANEL ─── */
+.panel{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);
+       border-radius:14px;padding:18px;min-width:200px;}
+.panel h3{color:rgba(255,255,255,.35);font-size:10px;text-transform:uppercase;
+          letter-spacing:.1em;margin-bottom:12px;font-weight:700;}
+.dbtn{display:flex;align-items:center;gap:8px;width:100%;padding:9px 12px;
+      border-radius:10px;border:1px solid rgba(255,255,255,.09);
+      background:rgba(255,255,255,.04);color:rgba(255,255,255,.65);
+      font-size:12.5px;font-weight:600;cursor:pointer;margin-bottom:7px;text-align:left;
+      transition:all .12s;}
+.dbtn:hover{background:rgba(255,255,255,.09);}
+.dbtn.on{background:rgba(74,222,128,.1);border-color:rgba(74,222,128,.25);color:#4ade80;}
+.dbtn span{font-size:15px;}
+.state-badge{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:6px;
+             background:rgba(74,222,128,.1);color:#4ade80;font-size:11px;font-weight:700;
+             border:1px solid rgba(74,222,128,.2);margin-bottom:14px;}
+</style>
+</head>
+<body>
+<div class="scene">
+
+  <!-- TELEFONE -->
+  <div class="col">
+    <div class="lbl">Viewer GPS Premium</div>
+    <div class="phone" id="phone">
+
+      <!-- Status bar -->
+      <div class="sb">
+        <span>9:41</span>
+        <span style="display:flex;gap:6px;align-items:center">
+          <svg width="16" height="12" viewBox="0 0 16 12" fill="rgba(255,255,255,.55)">
+            <rect x="0" y="4" width="3" height="8" rx="1"/>
+            <rect x="4.5" y="2.5" width="3" height="9.5" rx="1"/>
+            <rect x="9" y="1" width="3" height="11" rx="1"/>
+            <rect x="13.5" y="0" width="2.5" height="12" rx="1" opacity=".4"/>
+          </svg>
+          <svg width="16" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="2">
+            <path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/>
+          </svg>
+          🔋
+        </span>
+      </div>
+
+      <!-- Nav header -->
+      <div class="nh">
+        <div class="nh-back">‹</div>
+        <div class="nh-title">Perdizes – Bloco 1 – Vias</div>
+      </div>
+
+      <!-- Map -->
+      <div class="map" id="map">
+
+        <!-- Terrain SVG -->
+        <svg class="terrain" viewBox="0 0 360 606" xmlns="http://www.w3.org/2000/svg">
+          <!-- topo grid -->
+          <defs>
+            <pattern id="g" width="36" height="36" patternUnits="userSpaceOnUse">
+              <path d="M 36 0 L 0 0 0 36" fill="none" stroke="rgba(255,255,255,.04)" stroke-width=".7"/>
+            </pattern>
+          </defs>
+          <rect width="360" height="606" fill="url(#g)"/>
+          <!-- roads -->
+          <path d="M0 200 Q90 185 190 215 Q290 245 360 228" stroke="rgba(255,220,80,.3)" stroke-width="5" fill="none" stroke-linecap="round"/>
+          <path d="M0 360 Q110 355 200 375 Q290 395 360 385" stroke="rgba(255,220,80,.2)" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+          <path d="M130 0 Q138 150 144 320 Q150 450 154 606" stroke="rgba(255,220,80,.22)" stroke-width="4" fill="none" stroke-linecap="round"/>
+          <path d="M250 0 Q255 160 260 310 Q265 440 268 606" stroke="rgba(255,220,80,.16)" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <!-- contour lines -->
+          <ellipse cx="180" cy="280" rx="130" ry="90" fill="none" stroke="rgba(74,222,128,.12)" stroke-width="1.5"/>
+          <ellipse cx="180" cy="280" rx="90" ry="60" fill="none" stroke="rgba(74,222,128,.1)" stroke-width="1.5"/>
+          <ellipse cx="180" cy="280" rx="55" ry="36" fill="none" stroke="rgba(74,222,128,.09)" stroke-width="1.5"/>
+          <!-- areas -->
+          <rect x="50" y="140" width="80" height="55" rx="5" fill="rgba(74,222,128,.04)" stroke="rgba(74,222,128,.18)" stroke-width="1.5"/>
+          <rect x="200" y="330" width="100" height="65" rx="5" fill="rgba(59,130,246,.04)" stroke="rgba(59,130,246,.18)" stroke-width="1.5"/>
+          <!-- labels -->
+          <text x="90" y="172" fill="rgba(255,255,255,.4)" font-size="10" text-anchor="middle" font-weight="600">T-04A</text>
+          <text x="250" y="368" fill="rgba(255,255,255,.4)" font-size="10" text-anchor="middle" font-weight="600">T-04B</text>
+          <text x="50" y="200" fill="rgba(255,220,80,.5)" font-size="9" font-weight="700">EST.01</text>
+          <text x="270" y="385" fill="rgba(255,220,80,.5)" font-size="9" font-weight="700">EST.02</text>
+          <!-- north arrow -->
+          <g transform="translate(330,42)">
+            <circle r="16" fill="rgba(10,11,17,.85)" stroke="rgba(255,255,255,.09)" stroke-width="1"/>
+            <polygon points="0,-10 -4.5,5 0,2 4.5,5" fill="rgba(255,255,255,.7)"/>
+            <text y="17" fill="rgba(255,255,255,.45)" font-size="9" text-anchor="middle" font-weight="700">N</text>
+          </g>
+        </svg>
+
+        <!-- GPS dot -->
+        <div class="gps-pos" id="gpsPos" style="left:42%;top:44%">
+          <div class="ring"></div>
+          <div class="gdot"><div class="ginner"></div></div>
+        </div>
+
+        <!-- Trajectory lines (hidden initially) -->
+        <div id="traj" style="opacity:0;transition:opacity .3s;position:absolute;inset:0;pointer-events:none;">
+          <div class="tl" style="background:#ef4444;left:138px;top:268px;width:38px;transform:rotate(-14deg)"></div>
+          <div class="tl" style="background:#ef4444;left:173px;top:258px;width:44px;transform:rotate(10deg)"></div>
+          <div class="tl" style="background:#ef4444;left:213px;top:265px;width:36px;transform:rotate(-6deg)"></div>
+          <div class="tl" style="background:#ef4444;left:246px;top:262px;width:32px;transform:rotate(22deg)"></div>
+          <div class="tl" style="background:#f59e0b;left:138px;top:274px;width:148px;transform:rotate(4deg);opacity:.65"></div>
+        </div>
+
+        <!-- GPS chip -->
+        <div class="gps-chip" id="chip" style="top:12px">
+          <div class="dot off" id="dotEl"></div>
+          <span id="coords">-19.94231°&nbsp;&nbsp;-47.21854°</span>
+          <div class="acc-pill" id="accPill">±4m</div>
+        </div>
+
+        <!-- Warning -->
+        <div class="warn" id="warn">⚠️&nbsp; Você está fora da área deste mapa</div>
+
+        <!-- TOOLBAR -->
+        <div class="toolbar">
+          <!-- GPS -->
+          <div class="tb" id="tbGps" onclick="toggleGps()" title="GPS">
+            <svg class="ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3" fill="currentColor" opacity=".4"/>
+              <line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/>
+              <line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>
+            </svg>
+          </div>
+          <div class="td"></div>
+          <!-- Zoom + -->
+          <div class="tb" onclick="zoom(1)" title="Zoom +">
+            <svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+          </div>
+          <!-- Zoom - -->
+          <div class="tb" onclick="zoom(-1)" title="Zoom -">
+            <svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+          </div>
+          <div class="td"></div>
+          <!-- Menu -->
+          <div class="tb" onclick="toggleMenu()" title="Menu">
+            <svg class="ic" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/>
+            </svg>
+          </div>
+          <div class="td"></div>
+          <!-- Fullscreen -->
+          <div class="tb" id="tbFull" onclick="toggleFull()" title="Tela cheia">
+            <svg class="ic" id="fsIcon" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Record pills -->
+        <div class="rpw" id="rpw">
+          <div class="pill" id="pillMode" onclick="toggleMode()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+            <span id="modeLabel">Linha</span>
+          </div>
+          <div class="pill rec" id="pillRec" onclick="toggleRec()">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" id="recSvg">
+              <circle cx="12" cy="12" r="8"/>
+            </svg>
+            <span id="recLabel">Gravar</span>
+          </div>
+        </div>
+
+        <!-- Recording bar -->
+        <div class="recbar" id="recbar">
+          <div class="recdot"></div>
+          <div class="recmain">
+            <div class="reclabel" id="recbLabel">Gravando · 0 pts · 0 m</div>
+            <div class="recsub" id="recbSub"></div>
+          </div>
+          <div class="rectime" id="recbTime">0s</div>
+        </div>
+
+        <!-- Legend -->
+        <div class="legend" id="leg">
+          SW -19.95124°, -47.23001°&nbsp;&nbsp;NE -19.93021°, -47.19887°
+        </div>
+
+        <!-- Pino de coordenada -->
+        <div id="coordPin" style="position:absolute;display:none;z-index:25;transform:translate(-50%,-100%)">
+          <svg width="28" height="36" viewBox="0 0 28 36">
+            <path d="M14 0C6.268 0 0 6.268 0 14c0 10.5 14 22 14 22S28 24.5 28 14C28 6.268 21.732 0 14 0z" fill="#f59e0b"/>
+            <circle cx="14" cy="14" r="5" fill="white"/>
+          </svg>
+        </div>
+
+        <!-- Toast (inside map, bottom overlay) -->
+        <div id="toast" style="position:absolute;bottom:80px;left:50%;transform:translateX(-50%);
+          background:rgba(10,11,17,.95);border:1px solid rgba(255,255,255,.1);border-radius:12px;
+          padding:9px 16px;font-size:13px;font-weight:600;color:#fff;z-index:60;
+          opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap"></div>
+
+        <!-- Action menu overlay -->
+        <div class="overlay" id="overlay" onclick="handleOverlayClick(event)">
+          <div class="sheet">
+            <div class="handle"></div>
+            <div class="mi" onclick="toggleFull();closeMenu()">
+              <div class="mi-icon">⛶</div>
+              <div class="mi-body">
+                <div class="mi-label green" id="miFullLabel">Tela cheia</div>
+                <div class="mi-sub">Maximizar o mapa</div>
+              </div>
+              <div class="mi-chev">›</div>
+            </div>
+            <div class="mi" onclick="toggleMode();closeMenu()">
+              <div class="mi-icon" id="miModeIcon">〰</div>
+              <div class="mi-body">
+                <div class="mi-label" id="miModeLabel">Modo: Linha</div>
+                <div class="mi-sub">Toque para mudar para Área</div>
+              </div>
+              <div class="mi-chev">›</div>
+            </div>
+            <div class="mi" onclick="toggleRec();closeMenu()">
+              <div class="mi-icon">⏺</div>
+              <div class="mi-body">
+                <div class="mi-label" id="miRecLabel">Gravar trajeto</div>
+                <div class="mi-sub">Inicia registro GPS no mapa</div>
+              </div>
+              <div class="mi-chev">›</div>
+            </div>
+            <div class="mi" onclick="openCoordModal()">
+              <div class="mi-icon">🔍</div>
+              <div class="mi-body">
+                <div class="mi-label">Buscar coordenadas</div>
+                <div class="mi-sub">Ir para lat/lng específico</div>
+              </div>
+              <div class="mi-chev">›</div>
+            </div>
+            <div class="mi" onclick="openMediaModal()">
+              <div class="mi-icon">📐</div>
+              <div class="mi-body">
+                <div class="mi-label">Traçar média GPS</div>
+                <div class="mi-sub">Coleta amostras — reduz erro</div>
+              </div>
+              <div class="mi-chev">›</div>
+            </div>
+            <div class="mi" onclick="openFotoModal()">
+              <div class="mi-icon">📸</div>
+              <div class="mi-body">
+                <div class="mi-label">Plotar foto aqui</div>
+                <div class="mi-sub">Georreferencia com GPS atual</div>
+              </div>
+              <div class="mi-chev">›</div>
+            </div>
+            <div class="mi" onclick="openHistModal()">
+              <div class="mi-icon">⏱</div>
+              <div class="mi-body">
+                <div class="mi-label">Histórico de trajetos</div>
+                <div class="mi-sub">Ver ou sobrepor trajeto salvo</div>
+              </div>
+              <div class="mi-chev">›</div>
+            </div>
+            <div class="mi" onclick="closeMenu()">
+              <div class="mi-body" style="text-align:center">
+                <div class="mi-label" style="color:rgba(255,255,255,.3)">Fechar</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /map -->
+
+      <!-- ── MODAL: Buscar coordenadas ── -->
+      <div class="modal-bg" id="mCoord" onclick="closeAllModals(event,'mCoord')">
+        <div class="modal-box">
+          <div class="modal-title">🔍 Buscar coordenadas</div>
+          <div class="modal-sub">Digite lat/lng para posicionar pino no mapa</div>
+          <div class="minp-row">
+            <div class="minp-lbl">Latitude</div>
+            <input class="minp" id="inLat" type="number" step="0.00001" value="-19.94100" placeholder="-19.94231"/>
+          </div>
+          <div class="minp-row">
+            <div class="minp-lbl">Longitude</div>
+            <input class="minp" id="inLng" type="number" step="0.00001" value="-47.22200" placeholder="-47.21854"/>
+          </div>
+          <div class="mbtn-row">
+            <div class="mbtn sec" onclick="closeModal('mCoord')">Cancelar</div>
+            <div class="mbtn pri" onclick="confirmarCoord()">Ir para ponto</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── MODAL: Traçar média GPS ── -->
+      <div class="modal-bg" id="mMedia" onclick="closeAllModals(event,'mMedia')">
+        <div class="modal-box">
+          <div class="modal-title">📐 Traçar média GPS</div>
+          <div class="modal-sub">Coletando amostras para reduzir o erro de posição</div>
+          <div style="text-align:center;margin:16px 0">
+            <div id="mediaProg" style="font-size:42px;font-weight:800;color:#4ade80;font-variant-numeric:tabular-nums">0</div>
+            <div style="color:rgba(255,255,255,.35);font-size:12px;margin-top:2px">amostras de 10</div>
+            <div style="width:100%;height:6px;background:rgba(255,255,255,.07);border-radius:3px;margin:14px 0 6px">
+              <div id="mediaBar" style="height:6px;background:#4ade80;border-radius:3px;width:0%;transition:width .3s"></div>
+            </div>
+            <div id="mediaAcc" style="color:rgba(255,255,255,.4);font-size:12px">Aguardando GPS…</div>
+          </div>
+          <div class="mbtn-row">
+            <div class="mbtn sec" onclick="cancelarMedia()">Cancelar</div>
+            <div class="mbtn pri" id="mbtnMedia" onclick="marcarMedia()" style="opacity:.4;pointer-events:none">Marcar posição</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── MODAL: Plotar foto ── -->
+      <div class="modal-bg" id="mFoto" onclick="closeAllModals(event,'mFoto')">
+        <div class="modal-box">
+          <div class="modal-title">📸 Plotar foto aqui</div>
+          <div class="modal-sub" id="fotoSub">Georreferenciando com GPS atual<br><span style="font-size:11px;color:rgba(74,222,128,.8)">-19.94231° -47.21854°</span></div>
+          <div id="fotoPreview" style="width:100%;height:140px;border-radius:10px;margin:14px 0;
+            background:linear-gradient(135deg,#1a2a1a,#0d1a0d);border:1px dashed rgba(255,255,255,.1);
+            display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer"
+            onclick="simularFoto()">
+            <div style="font-size:32px">📷</div>
+            <div style="font-size:12px;color:rgba(255,255,255,.3)">Toque para capturar</div>
+          </div>
+          <div id="fotoPinInfo" style="display:none;padding:10px;background:rgba(74,222,128,.06);border-radius:8px;
+            border:1px solid rgba(74,222,128,.15);font-size:12px;color:rgba(255,255,255,.6)"></div>
+          <div class="mbtn-row">
+            <div class="mbtn sec" onclick="closeModal('mFoto')">Cancelar</div>
+            <div class="mbtn pri" id="mbtnFoto" onclick="closeModal('mFoto')" style="opacity:.4;pointer-events:none">Salvar no mapa</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── MODAL: Histórico de trajetos ── -->
+      <div class="modal-bg" id="mHist" onclick="closeAllModals(event,'mHist')">
+        <div class="modal-box">
+          <div class="modal-title">⏱ Histórico de trajetos</div>
+          <div class="modal-sub">Selecione para sobrepor no mapa</div>
+          <div style="margin:12px 0;display:flex;flex-direction:column;gap:8px">
+            <div class="hist-item" onclick="selectTrajeto(this,'28/05 14:22','1.2 km','Linha')">
+              <div class="hist-dot" style="background:#ef4444"></div>
+              <div class="hist-body">
+                <div class="hist-lbl">Patrulha Norte — Bloco 1</div>
+                <div class="hist-sub">28/05 14:22 · 1.2 km · 47 pts · Linha</div>
+              </div>
+              <div class="hist-chk" id="chk0"></div>
+            </div>
+            <div class="hist-item" onclick="selectTrajeto(this,'27/05 09:15','0.8 km','Área')">
+              <div class="hist-dot" style="background:#f59e0b"></div>
+              <div class="hist-body">
+                <div class="hist-lbl">Vistoria T-04A</div>
+                <div class="hist-sub">27/05 09:15 · 0.8 km · 32 pts · Área (2.4 ha)</div>
+              </div>
+              <div class="hist-chk" id="chk1"></div>
+            </div>
+            <div class="hist-item" onclick="selectTrajeto(this,'26/05 11:05','2.1 km','Linha')">
+              <div class="hist-dot" style="background:#3b82f6"></div>
+              <div class="hist-body">
+                <div class="hist-lbl">Conferência de Aceiro</div>
+                <div class="hist-sub">26/05 11:05 · 2.1 km · 84 pts · Linha</div>
+              </div>
+              <div class="hist-chk" id="chk2"></div>
+            </div>
+          </div>
+          <div class="mbtn-row">
+            <div class="mbtn sec" onclick="closeModal('mHist')">Fechar</div>
+            <div class="mbtn pri" id="mbtnHist" onclick="sobreporTrajeto()" style="opacity:.4;pointer-events:none">Sobrepor no mapa</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /phone -->
+  </div>
+
+  <!-- CONTROLES DEMO -->
+  <div class="col" style="margin-top:28px">
+    <div class="lbl">Demo interativo</div>
+
+    <div class="panel">
+      <div id="stateBadge" class="state-badge" style="display:none">
+        <svg width="8" height="8"><circle cx="4" cy="4" r="4" fill="#4ade80"/></svg>
+        GPS ativo
+      </div>
+
+      <h3>Estados</h3>
+      <button class="dbtn" id="dGps" onclick="toggleGps()">
+        <span>📡</span> GPS off → on
+      </button>
+      <button class="dbtn" id="dRec" onclick="toggleRec()" disabled style="opacity:.4">
+        <span>⏺</span> Gravar trajeto
+      </button>
+      <button class="dbtn" id="dFull" onclick="toggleFull()">
+        <span>⛶</span> Tela cheia
+      </button>
+      <button class="dbtn" id="dWarn" onclick="toggleWarn()">
+        <span>⚠️</span> Fora do mapa
+      </button>
+      <button class="dbtn" id="dTraj" onclick="toggleTraj()" disabled style="opacity:.4">
+        <span>〰</span> Mostrar trajeto
+      </button>
+      <button class="dbtn" onclick="toggleMenu()">
+        <span>⋯</span> Abrir menu
+      </button>
+
+      <h3 style="margin-top:14px">GPS simulado</h3>
+      <button class="dbtn" onclick="walkGps()">
+        <span>🚶</span> Simular caminhada
+      </button>
+    </div>
+
+    <!-- Legend -->
+    <div style="margin-top:10px;max-width:210px">
+      <div style="color:rgba(255,255,255,.25);font-size:11px;line-height:1.7">
+        <div>🔵 <strong style="color:rgba(255,255,255,.5)">Toolbar unificada</strong> — pill vertical direita</div>
+        <div>⏺ <strong style="color:rgba(255,255,255,.5)">Record pills</strong> — lado esquerdo, s/ GPS fica oculto</div>
+        <div>🟢 <strong style="color:rgba(255,255,255,.5)">GPS chip</strong> — dot animado + badge ±Xm</div>
+        <div>⛶ <strong style="color:rgba(255,255,255,.5)">Fullscreen</strong> — header some, mapa 100%</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<style>
+/* ── Modais ── */
+.modal-bg{position:absolute;inset:0;z-index:55;background:rgba(0,0,0,.6);display:none;
+  align-items:center;justify-content:center;padding:20px;}
+.modal-bg.show{display:flex;}
+.modal-box{background:#0d0f17;border-radius:18px;padding:22px;width:100%;max-width:320px;
+  border:1px solid rgba(255,255,255,.07);box-shadow:0 20px 60px rgba(0,0,0,.7);}
+.modal-title{font-size:16px;font-weight:800;color:#fff;margin-bottom:4px;}
+.modal-sub{font-size:12px;color:rgba(255,255,255,.4);margin-bottom:14px;line-height:1.4;}
+.minp-row{margin-bottom:10px;}
+.minp-lbl{font-size:11px;color:rgba(255,255,255,.4);margin-bottom:4px;font-weight:600;}
+.minp{width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
+  border-radius:9px;padding:9px 12px;color:#fff;font-size:14px;font-variant-numeric:tabular-nums;
+  outline:none;transition:border-color .15s;}
+.minp:focus{border-color:rgba(66,133,244,.6);}
+.mbtn-row{display:flex;gap:8px;margin-top:16px;}
+.mbtn{flex:1;padding:11px 10px;border-radius:10px;text-align:center;font-size:14px;
+  font-weight:700;cursor:pointer;transition:filter .15s;}
+.mbtn:hover{filter:brightness(1.1);}
+.mbtn.pri{background:#4285F4;color:#fff;}
+.mbtn.sec{background:rgba(255,255,255,.06);color:rgba(255,255,255,.6);}
+/* histórico */
+.hist-item{display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;
+  border:1px solid rgba(255,255,255,.06);cursor:pointer;transition:background .12s;}
+.hist-item:hover{background:rgba(255,255,255,.04);}
+.hist-item.sel{background:rgba(66,133,244,.08);border-color:rgba(66,133,244,.25);}
+.hist-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.hist-body{flex:1;}
+.hist-lbl{font-size:13px;font-weight:700;color:rgba(255,255,255,.85);}
+.hist-sub{font-size:11px;color:rgba(255,255,255,.35);margin-top:2px;}
+.hist-chk{width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,.15);}
+.hist-item.sel .hist-chk{background:#4285F4;border-color:#4285F4;}
+</style>
+
+<script>
+let gpsOn=false,recOn=false,fullOn=false,warnOn=false,polyMode=false,trajOn=false;
+let recSec=0,recInt=null,walkInt=null,walkIdx=0;
+
+const walkPath=[
+  {lat:-19.94231,lng:-47.21854,x:'42%',y:'44%'},
+  {lat:-19.94225,lng:-47.21846,x:'40%',y:'41%'},
+  {lat:-19.94218,lng:-47.21839,x:'37%',y:'38%'},
+  {lat:-19.94211,lng:-47.21845,x:'38%',y:'35%'},
+  {lat:-19.94207,lng:-47.21855,x:'41%',y:'32%'},
+  {lat:-19.94214,lng:-47.21863,x:'44%',y:'35%'},
+  {lat:-19.94222,lng:-47.21858,x:'43%',y:'38%'},
+  {lat:-19.94229,lng:-47.21851,x:'41%',y:'41%'},
+];
+
+function toggleGps(){
+  gpsOn=!gpsOn;
+  const chip=document.getElementById('chip');
+  const dot=document.getElementById('dotEl');
+  const pos=document.getElementById('gpsPos');
+  const rpw=document.getElementById('rpw');
+  const tb=document.getElementById('tbGps');
+  const dbtn=document.getElementById('dGps');
+  const dRec=document.getElementById('dRec');
+  const dTraj=document.getElementById('dTraj');
+  const badge=document.getElementById('stateBadge');
+
+  chip.classList.toggle('vis',gpsOn);
+  dot.classList.toggle('on',gpsOn);
+  pos.classList.toggle('vis',gpsOn);
+  rpw.classList.toggle('vis',gpsOn);
+  tb.classList.toggle('gps-on',gpsOn);
+  dbtn.classList.toggle('on',gpsOn);
+  badge.style.display=gpsOn?'inline-flex':'none';
+  dRec.disabled=!gpsOn; dRec.style.opacity=gpsOn?'1':'.4';
+  dTraj.disabled=!gpsOn; dTraj.style.opacity=gpsOn?'1':'.4';
+  dbtn.innerHTML=gpsOn?'<span>📡</span> GPS ativo':'<span>📡</span> GPS off → on';
+  if(!gpsOn&&recOn)toggleRec();
+}
+
+function toggleRec(){
+  if(!gpsOn&&!recOn)return;
+  recOn=!recOn;
+  const pill=document.getElementById('pillRec');
+  const bar=document.getElementById('recbar');
+  const svg=document.getElementById('recSvg');
+  const lbl=document.getElementById('recLabel');
+  const dbtn=document.getElementById('dRec');
+  const mi=document.getElementById('miRecLabel');
+
+  if(recOn){
+    pill.classList.add('on'); bar.classList.add('show');
+    lbl.textContent='Parar';
+    svg.innerHTML='<rect x="5" y="5" width="14" height="14" rx="2"/>';
+    dbtn.classList.add('on'); dbtn.innerHTML='<span>⏹</span> Parar gravação';
+    if(mi)mi.textContent='Parar gravação';
+    recSec=0;
+    recInt=setInterval(()=>{
+      recSec++;
+      const m=Math.floor(recSec/60),s=recSec%60;
+      document.getElementById('recbTime').textContent=m>0?`${m}min ${s}s`:`${s}s`;
+      const pts=Math.floor(recSec/2)+2;
+      const dist=Math.round(pts*3.7);
+      const area=(pts*0.85/100).toFixed(2);
+      document.getElementById('recbLabel').textContent=
+        (polyMode?'Poligonal':'Gravando')+` · ${pts} pts · ${dist} m`;
+      if(polyMode&&pts>=3)
+        document.getElementById('recbSub').textContent=`Área: ${area} ha · ${(area*10000).toFixed(0)} m²`;
+    },1000);
+  } else {
+    pill.classList.remove('on'); bar.classList.remove('show');
+    lbl.textContent='Gravar';
+    svg.innerHTML='<circle cx="12" cy="12" r="8"/>';
+    dbtn.classList.remove('on'); dbtn.innerHTML='<span>⏺</span> Gravar trajeto';
+    if(mi)mi.textContent='Gravar trajeto';
+    clearInterval(recInt);
+  }
+}
+
+function toggleMode(){
+  polyMode=!polyMode;
+  const p=document.getElementById('pillMode');
+  const l=document.getElementById('modeLabel');
+  const mi=document.getElementById('miModeLabel');
+  const ic=document.getElementById('miModeIcon');
+  if(polyMode){p.classList.add('poly');l.textContent='Área';if(mi)mi.textContent='Modo: Área';if(ic)ic.textContent='⬠';}
+  else{p.classList.remove('poly');l.textContent='Linha';if(mi)mi.textContent='Modo: Linha';if(ic)ic.textContent='〰';}
+}
+
+function toggleFull(){
+  fullOn=!fullOn;
+  const phone=document.getElementById('phone');
+  const tb=document.getElementById('tbFull');
+  const icon=document.getElementById('fsIcon');
+  const dbtn=document.getElementById('dFull');
+  const mi=document.getElementById('miFullLabel');
+
+  phone.classList.toggle('fs',fullOn);
+  tb.classList.toggle('full-on',fullOn);
+  dbtn.classList.toggle('on',fullOn);
+  dbtn.innerHTML=fullOn?'<span>⛶</span> Sair da tela cheia':'<span>⛶</span> Tela cheia';
+  if(mi)mi.textContent=fullOn?'Sair da tela cheia':'Tela cheia';
+
+  if(fullOn){
+    icon.innerHTML='<path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 0 2 2v3M16 21v-3a2 2 0 0 0 2-2h3"/>';
+    icon.setAttribute('stroke','#4ade80');
+  } else {
+    icon.innerHTML='<path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/>';
+    icon.setAttribute('stroke','currentColor');
+  }
+}
+
+function toggleWarn(){
+  warnOn=!warnOn;
+  document.getElementById('warn').classList.toggle('show',warnOn);
+  const b=document.getElementById('dWarn');
+  b.classList.toggle('on',warnOn);
+}
+
+function toggleTraj(){
+  trajOn=!trajOn;
+  document.getElementById('traj').style.opacity=trajOn?'1':'0';
+  document.getElementById('dTraj').classList.toggle('on',trajOn);
+}
+
+function toggleMenu(){document.getElementById('overlay').classList.toggle('show');}
+function closeMenu(){document.getElementById('overlay').classList.remove('show');}
+function handleOverlayClick(e){if(e.target===document.getElementById('overlay'))closeMenu();}
+
+function zoom(d){
+  const map=document.getElementById('map');
+  let s=parseFloat(map.dataset.scale||'1');
+  s=Math.max(.6,Math.min(2.6,s+d*.3));
+  map.dataset.scale=s;
+  const svg=map.querySelector('.terrain');
+  svg.style.transform=`scale(${s})`;
+  svg.style.transition='transform .2s';
+  svg.style.transformOrigin='center center';
+}
+
+// ── Modal helpers ──
+function closeModal(id){document.getElementById(id).classList.remove('show');}
+function closeAllModals(e,id){if(e.target===document.getElementById(id))closeModal(id);}
+function openCoordModal(){closeMenu();document.getElementById('mCoord').classList.add('show');}
+
+function confirmarCoord(){
+  const lat=parseFloat(document.getElementById('inLat').value);
+  const lng=parseFloat(document.getElementById('inLng').value);
+  if(isNaN(lat)||isNaN(lng)||lat<-90||lat>90||lng<-180||lng>180){
+    document.getElementById('inLat').style.borderColor='rgba(239,68,68,.5)';
+    return;
+  }
+  closeModal('mCoord');
+  // posiciona pino no centro (demo)
+  const pin=document.getElementById('coordPin');
+  pin.style.display='block';
+  pin.style.left='53%';
+  pin.style.top='35%';
+  showToast(`📍 ${lat.toFixed(5)}°  ${lng.toFixed(5)}°`);
+}
+
+// ── Média GPS ──
+let mediaInt=null,mediaSamples=0;
+function openMediaModal(){
+  if(!gpsOn){showToast('❌ Ligue o GPS primeiro');return;}
+  closeMenu();
+  mediaSamples=0;
+  document.getElementById('mediaProg').textContent='0';
+  document.getElementById('mediaBar').style.width='0%';
+  document.getElementById('mediaAcc').textContent='Coletando amostras…';
+  document.getElementById('mbtnMedia').style.opacity='.4';
+  document.getElementById('mbtnMedia').style.pointerEvents='none';
+  document.getElementById('mMedia').classList.add('show');
+  mediaInt=setInterval(()=>{
+    mediaSamples++;
+    document.getElementById('mediaProg').textContent=mediaSamples;
+    document.getElementById('mediaBar').style.width=(mediaSamples*10)+'%';
+    const acc=Math.max(2,(5-mediaSamples*0.3)).toFixed(1);
+    document.getElementById('mediaAcc').textContent=`Erro médio: ±${acc}m`;
+    if(mediaSamples>=10){
+      clearInterval(mediaInt);
+      document.getElementById('mediaAcc').textContent='✅ Pronto — erro reduzido para ±2.1m';
+      document.getElementById('mbtnMedia').style.opacity='1';
+      document.getElementById('mbtnMedia').style.pointerEvents='auto';
+    }
+  },400);
+}
+function cancelarMedia(){clearInterval(mediaInt);closeModal('mMedia');}
+function marcarMedia(){
+  clearInterval(mediaInt);
+  closeModal('mMedia');
+  const pin=document.getElementById('coordPin');
+  pin.style.display='block';
+  pin.style.left='44%';
+  pin.style.top='45%';
+  showToast('📐 Posição média marcada — ±2.1m');
+}
+
+// ── Plotar foto ──
+function openFotoModal(){
+  closeMenu();
+  const lat=gpsOn?'-19.94231':'--.-----';
+  const lng=gpsOn?'-47.21854':'--.-----';
+  document.getElementById('fotoSub').innerHTML=`Georreferenciando com GPS atual<br><span style="font-size:11px;color:rgba(74,222,128,.8)">${lat}° ${lng}°</span>`;
+  document.getElementById('fotoPreview').style.backgroundImage='';
+  document.getElementById('fotoPreview').innerHTML='<div style="font-size:32px">📷</div><div style="font-size:12px;color:rgba(255,255,255,.3)">Toque para capturar</div>';
+  document.getElementById('fotoPinInfo').style.display='none';
+  document.getElementById('mbtnFoto').style.opacity='.4';
+  document.getElementById('mbtnFoto').style.pointerEvents='none';
+  document.getElementById('mFoto').classList.add('show');
+}
+function simularFoto(){
+  const prev=document.getElementById('fotoPreview');
+  prev.innerHTML='<div style="font-size:22px">🌿</div><div style="font-size:12px;color:rgba(255,255,255,.5)">foto_001.jpg · 1.4 MB</div><div style="font-size:11px;color:rgba(255,255,255,.25);margin-top:3px">14:28 · -19.94231°, -47.21854°</div>';
+  prev.style.background='linear-gradient(135deg,#1a3a1a,#0d250d)';
+  prev.style.border='1px solid rgba(74,222,128,.2)';
+  document.getElementById('fotoPinInfo').style.display='block';
+  document.getElementById('fotoPinInfo').textContent='📌 Pino plotado em -19.94231°, -47.21854°';
+  document.getElementById('mbtnFoto').style.opacity='1';
+  document.getElementById('mbtnFoto').style.pointerEvents='auto';
+}
+
+// ── Histórico ──
+let histSel=null;
+function openHistModal(){closeMenu();histSel=null;document.getElementById('mHist').classList.add('show');}
+function selectTrajeto(el,data,dist,tipo){
+  document.querySelectorAll('.hist-item').forEach(i=>i.classList.remove('sel'));
+  el.classList.add('sel');
+  histSel=el;
+  document.getElementById('mbtnHist').style.opacity='1';
+  document.getElementById('mbtnHist').style.pointerEvents='auto';
+}
+function sobreporTrajeto(){
+  closeModal('mHist');
+  if(!trajOn)toggleTraj();
+  showToast('⏱ Trajeto sobreposto no mapa');
+}
+
+// ── Toast ──
+let toastTimer=null;
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.style.opacity='1';
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>{t.style.opacity='0';},2500);
+}
+
+function walkGps(){
+  if(!gpsOn)toggleGps();
+  if(walkInt)clearInterval(walkInt);
+  walkIdx=0;
+  const pos=document.getElementById('gpsPos');
+  const acc=[4,3,5,4,3,6,4,5][0];
+  walkInt=setInterval(()=>{
+    const p=walkPath[walkIdx%walkPath.length];
+    pos.style.left=p.x; pos.style.top=p.y;
+    document.getElementById('coords').textContent=
+      p.lat.toFixed(5)+'°\u00a0\u00a0'+p.lng.toFixed(5)+'°';
+    document.getElementById('accPill').textContent='±'+[4,3,5,4,3,6,4,5][walkIdx%8]+'m';
+    walkIdx++;
+    if(walkIdx>=walkPath.length*4){clearInterval(walkInt);walkInt=null;}
+  },700);
+}
+</script>
+</body>
+</html>

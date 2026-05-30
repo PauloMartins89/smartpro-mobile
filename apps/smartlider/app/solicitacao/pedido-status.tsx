@@ -11,6 +11,7 @@ import {
   ActivityIndicator, Platform, RefreshControl,
 } from 'react-native'
 import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../src/lib/supabase'
 import { C, fmtDate } from '../../src/lib/theme'
@@ -172,6 +173,7 @@ function ResumoRow({ icon, label, value, valueStyle }: any) {
 export default function PedidoStatusScreen() {
   const router     = useRouter()
   const nav        = useNavigation()
+  const insets     = useSafeAreaInsets()
   const params     = useLocalSearchParams<{
     id:          string
     numero:      string
@@ -470,7 +472,7 @@ export default function PedidoStatusScreen() {
       </ScrollView>
 
       {/* ── FOOTER FIXO ──────────────────────────────────────────────────── */}
-      <View style={ss.footer}>
+      <View style={[ss.footer, { paddingBottom: (Platform.OS === 'ios' ? 32 : 14) + insets.bottom }]}>
 
         {/* Botão primário: varia por status */}
         {status === 'reprovado' ? (

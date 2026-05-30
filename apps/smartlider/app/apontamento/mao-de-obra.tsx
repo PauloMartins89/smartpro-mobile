@@ -6,6 +6,7 @@ import {
   Modal, Image, Vibration,
 } from 'react-native'
 import { useNavigation } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../../src/lib/supabase'
@@ -33,6 +34,7 @@ const MOTIVOS = [
 
 export default function MaoDeObraScreen() {
   const nav         = useNavigation()
+  const insets      = useSafeAreaInsets()
   const turnoAtivo  = useLiderStore(s => s.turnoAtivo)
   const workspaceId = useLiderStore(s => s.workspaceId)
   const addToQueue  = useSyncStore(s => s.addToQueue)
