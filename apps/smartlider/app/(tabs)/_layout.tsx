@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Platform, ActivityIndicator }
 import { Ionicons } from '@expo/vector-icons'
 import { useEffect, useState } from 'react'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import * as Updates from 'expo-updates'
 import useLiderStore from '../../src/store/useLiderStore'
 import { C, TURNO_LABEL } from '../../src/lib/theme'
 import RightDrawer from '../../src/components/RightDrawer'
@@ -36,8 +37,12 @@ export default function TabsLayout() {
 
   if (!turnoAtivo) return null
 
+  // Android 15+ edge-to-edge (targetSdkVersion 36): garante mínimo de 56dp
+  const bottomInset = Platform.OS === 'android' ? Math.max(insets.bottom, 56) : insets.bottom
+  const otaId = Updates.currentlyRunning?.updateId?.slice(0, 8) ?? 'embedded'
+
   return (
-    <View style={{ flex: 1, paddingBottom: insets.bottom }}>
+    <View style={{ flex: 1, paddingBottom: bottomInset }}>
       {/* Barra de contexto persistente */}
       <View style={styles.contextBar}>
         <View style={styles.contextLeft}>
@@ -60,6 +65,8 @@ export default function TabsLayout() {
           </TouchableOpacity>
         </View>
       </View>
+      {/* DEBUG: confirma qual bundle/OTA está rodando */}
+      <Text style={{ position: 'absolute', top: 4, left: 8, fontSize: 8, color: 'rgba(255,255,255,0.35)', zIndex: 999 }}>OTA:{otaId}</Text>
 
       <Tabs
         screenOptions={{
