@@ -6,6 +6,7 @@ import {
   Modal, TextInput, FlatList, KeyboardAvoidingView, Platform, Linking,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { GestureDetector, Gesture } from 'react-native-gesture-handler'
 import { useLocalSearchParams, useNavigation } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Location from 'expo-location'
@@ -113,10 +114,11 @@ export default function MapaViewerScreen() {
   const [trajeto,   setTrajeto]   = useState([])      // [{lat, lng, ts}]
   const [inicioTs,  setInicioTs]  = useState(null)
   const [modo,      setModo]      = useState('linha') // 'linha' | 'poligonal'
-  const locSub    = useRef(null)
-  const gravarRef  = useRef(false)
-  const trajetoRef = useRef([])
-  const modoRef    = useRef('linha')
+  const locSub      = useRef(null)
+  const gravarRef   = useRef(false)
+  const trajetoRef  = useRef([])
+  const modoRef     = useRef('linha')
+  const baseScaleRef = useRef(1)
 
   // ── UI modals ────────────────────────────────────────────────────
   const [menuOpen,    setMenuOpen]    = useState(false)
@@ -387,8 +389,16 @@ export default function MapaViewerScreen() {
   useEffect(() => () => locSub.current?.remove(), [])
 
   // ── Zoom helpers ──────────────────────────────────────────────────────────
-  const zoomIn  = () => setScale(s => Math.min(s + 0.5, 4))
-  const zoomOut = () => setScale(s => Math.max(s - 0.5, 0.5))
+  const zoomIn  = () => setScale(s => { const n = Math.min(s + 0.5, 4);  baseScaleRef.current = n; return n })
+  const zoomOut = () => setScale(s => { const n = Math.max(s - 0.5, 0.5); baseScaleRef.current = n; return n })
+
+  const pinchGesture = Gesture.Pinch()
+    .runOnJS(true)
+    .onBegin(() => { baseScaleRef.current = scale })
+    .onUpdate(e => {
+      const next = Math.min(4, Math.max(0.5, baseScaleRef.current * e.scale))
+      setScale(next)
+    })
 
   // ── Loading ───────────────────────────────────────────────────────────────
   if (loading || !mapa) return (
@@ -430,6 +440,7 @@ export default function MapaViewerScreen() {
       )}
 
       {/* Mapa com GPS overlay */}
+      <GestureDetector gesture={pinchGesture}>
       <ScrollView
         style={st.scroll}
         contentContainerStyle={{ width: mapW, minHeight: mapH }}
@@ -574,6 +585,7 @@ export default function MapaViewerScreen() {
           </View>
         </ScrollView>
       </ScrollView>
+      </GestureDetector>
 
       {/* ── Floating Toolbar (direita) ──────────────────────────────────────── */}
       <View style={[st.toolbar, { bottom: insets.bottom + 20 }]}>
