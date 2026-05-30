@@ -72,7 +72,7 @@
       "url": "https://u.expo.dev/1f379ffd-098a-4c7c-aa93-b729ed5dfdda",
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 0
+      "fallbackToCacheTimeout": 3000
     },
     "extra": {
       "router": {},
