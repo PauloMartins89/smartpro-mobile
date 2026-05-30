@@ -248,11 +248,6 @@ const st = StyleSheet.create({
                    justifyContent: 'center', borderLeftWidth: 1, borderLeftColor: C.border },
 })
 
-
-const TIPO_LABEL = { acesso: 'Acesso', microplanejamento: 'Microplanejamento', outro: 'Outro' }
-const TIPO_COLOR = { acesso: C.primary, microplanejamento: '#e67e22', outro: C.textMuted }
-const TIPO_ICON  = { acesso: 'navigate-outline', microplanejamento: 'map-outline', outro: 'document-outline' }
-
 export default function MapaListScreen() {
   const nav         = useNavigation()
   const router      = useRouter()
