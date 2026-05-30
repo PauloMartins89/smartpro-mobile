@@ -26,7 +26,7 @@ create policy "workspace_members_trajetos"
   on lider_trajetos for all
   using (
     workspace_id in (
-      select workspace_id from lider_funcionarios
+      select workspace_id from workspace_members
       where user_id = auth.uid()
     )
   );
