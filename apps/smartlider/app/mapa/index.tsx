@@ -1,4 +1,4 @@
-// @ts-nocheck
+﻿// @ts-nocheck
 import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
@@ -33,7 +33,7 @@ export default function MapaListScreen() {
   const [loading,    setLoading]    = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [dlStatus,   setDlStatus]   = useState({})   // { [id]: 'idle'|'downloading'|'done' }
-  const [dlProgress, setDlProgress] = useState({})   // { [id]: 0–1 }
+  const [dlProgress, setDlProgress] = useState({})   // { [id]: 0â€“1 }
   const dlRef = useRef({})
 
   useEffect(() => { nav.setOptions({ title: 'Mapas' }) }, [])
@@ -52,10 +52,10 @@ export default function MapaListScreen() {
     const lista = data ?? []
     setMapas(lista)
 
-    // Verifica quais mapas já estão em cache local
+    // Verifica quais mapas jÃ¡ estÃ£o em cache local
     const status = { ...dlStatus }
     await Promise.all(lista.map(async m => {
-      if (status[m.id] === 'downloading') return   // não sobrescreve download ativo
+      if (status[m.id] === 'downloading') return   // nÃ£o sobrescreve download ativo
       const info = await FileSystem.getInfoAsync(localPath(m.id))
       status[m.id] = info.exists ? 'done' : 'idle'
     }))
@@ -66,7 +66,7 @@ export default function MapaListScreen() {
 
   useEffect(() => { carregar() }, [carregar])
 
-  // ── Download individual ────────────────────────────────────────────────────
+  // â”€â”€ Download individual â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const baixar = useCallback(async (m) => {
     if (!m.imagem_url || dlRef.current[m.id]) return
     try {
@@ -100,11 +100,11 @@ export default function MapaListScreen() {
     }
   }, [])
 
-  // ── Remover cache ────────────────────────────────────────────────────────
+  // â”€â”€ Remover cache â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const removerCache = useCallback((m) => {
     Alert.alert(
       'Remover download?',
-      `"${m.nome}" será removido do armazenamento offline.`,
+      `"${m.nome}" serÃ¡ removido do armazenamento offline.`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -117,7 +117,7 @@ export default function MapaListScreen() {
     )
   }, [])
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (loading) return (
     <View style={st.center}>
       <ActivityIndicator size="large" color={C.primary} />
@@ -133,7 +133,7 @@ export default function MapaListScreen() {
       {mapas.length === 0 ? (
         <View style={st.empty}>
           <Ionicons name="map-outline" size={48} color={C.textMuted} />
-          <Text style={st.emptyTitle}>Nenhum mapa disponível</Text>
+          <Text style={st.emptyTitle}>Nenhum mapa disponÃ­vel</Text>
           <Text style={st.emptySub}>
             Importe mapas GeoPDF pelo script{'\n'}
             scripts/geopdf_to_supabase.py
@@ -147,7 +147,7 @@ export default function MapaListScreen() {
 
           return (
             <View key={m.id} style={st.card}>
-              {/* Área clicável → abre mapa */}
+              {/* Ãrea clicÃ¡vel â†’ abre mapa */}
               <TouchableOpacity
                 style={st.cardTouchable}
                 onPress={() => router.push(`/mapa/${m.id}`)}
@@ -190,7 +190,7 @@ export default function MapaListScreen() {
                 </View>
               </TouchableOpacity>
 
-              {/* Botão de download / remover (não propaga o tap para o card) */}
+              {/* BotÃ£o de download / remover (nÃ£o propaga o tap para o card) */}
               <TouchableOpacity
                 style={st.dlBtn}
                 onPress={() => st_dl === 'done' ? removerCache(m) : baixar(m)}
@@ -246,95 +246,4 @@ const st = StyleSheet.create({
 
   dlBtn:         { paddingHorizontal: 14, paddingVertical: 14, alignSelf: 'stretch',
                    justifyContent: 'center', borderLeftWidth: 1, borderLeftColor: C.border },
-})
-
-export default function MapaListScreen() {
-  const nav         = useNavigation()
-  const router      = useRouter()
-  const workspaceId = useLiderStore(s => s.workspaceId)
-  const [mapas,   setMapas]   = useState([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => { nav.setOptions({ title: 'Mapas' }) }, [])
-
-  const carregar = useCallback(async () => {
-    if (!workspaceId) return
-    setLoading(true)
-    const { data } = await supabase
-      .from('lider_mapas')
-      .select('id, nome, descricao, tipo, sw_lat, sw_lng, ne_lat, ne_lng, pdf_origem, criado_em')
-      .eq('workspace_id', workspaceId)
-      .eq('ativo', true)
-      .order('criado_em', { ascending: false })
-    setMapas(data ?? [])
-    setLoading(false)
-  }, [workspaceId])
-
-  useEffect(() => { carregar() }, [carregar])
-
-  if (loading) return (
-    <View style={st.center}>
-      <ActivityIndicator size="large" color={C.primary} />
-    </View>
-  )
-
-  return (
-    <ScrollView style={st.root} contentContainerStyle={{ padding: 16 }}>
-      {mapas.length === 0 ? (
-        <View style={st.empty}>
-          <Ionicons name="map-outline" size={48} color={C.textMuted} />
-          <Text style={st.emptyTitle}>Nenhum mapa disponível</Text>
-          <Text style={st.emptySub}>
-            Importe mapas GeoPDF pelo script{'\n'}
-            scripts/geopdf_to_supabase.py
-          </Text>
-        </View>
-      ) : (
-        mapas.map(m => (
-          <TouchableOpacity
-            key={m.id}
-            style={st.card}
-            onPress={() => router.push(`/mapa/${m.id}`)}
-            activeOpacity={0.82}>
-            <View style={[st.iconWrap, { backgroundColor: (TIPO_COLOR[m.tipo] ?? C.primary) + '22' }]}>
-              <Ionicons name={TIPO_ICON[m.tipo] ?? 'map-outline'} size={24} color={TIPO_COLOR[m.tipo] ?? C.primary} />
-            </View>
-            <View style={st.cardBody}>
-              <Text style={st.cardTitle}>{m.nome}</Text>
-              {!!m.descricao && <Text style={st.cardSub}>{m.descricao}</Text>}
-              <View style={st.cardMeta}>
-                <View style={[st.badge, { backgroundColor: (TIPO_COLOR[m.tipo] ?? C.primary) + '20' }]}>
-                  <Text style={[st.badgeTxt, { color: TIPO_COLOR[m.tipo] ?? C.primary }]}>
-                    {TIPO_LABEL[m.tipo] ?? m.tipo}
-                  </Text>
-                </View>
-                {!!m.pdf_origem && (
-                  <Text style={st.metaTxt} numberOfLines={1}>{m.pdf_origem}</Text>
-                )}
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={C.textMuted} />
-          </TouchableOpacity>
-        ))
-      )}
-    </ScrollView>
-  )
-}
-
-const st = StyleSheet.create({
-  root:        { flex: 1, backgroundColor: C.bg },
-  center:      { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  empty:       { flex: 1, alignItems: 'center', paddingTop: 80, gap: 10 },
-  emptyTitle:  { fontSize: 18, fontWeight: '700', color: C.text },
-  emptySub:    { fontSize: 13, color: C.textMuted, textAlign: 'center', lineHeight: 20 },
-  card:        { flexDirection: 'row', alignItems: 'center', backgroundColor: C.bgCard, borderRadius: 14,
-                 padding: 14, marginBottom: 10, borderWidth: 1, borderColor: C.border },
-  iconWrap:    { width: 48, height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
-  cardBody:    { flex: 1, gap: 4 },
-  cardTitle:   { fontSize: 15, fontWeight: '700', color: C.text },
-  cardSub:     { fontSize: 13, color: C.textMuted },
-  cardMeta:    { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  badge:       { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-  badgeTxt:    { fontSize: 11, fontWeight: '600' },
-  metaTxt:     { fontSize: 11, color: C.textMuted },
 })
