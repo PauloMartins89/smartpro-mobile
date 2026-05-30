@@ -1,0 +1,34 @@
+# Preview / dev tools (não fazem parte do app)
+preview-*.html
+gen-icons.mjs
+generate-icons.mjs
+screenshot-status.cjs
+
+# Logs
+*.log
+
+# Arquivos de investigação e documentação
+INVESTIGACAO_TRIM_ERROR.md
+README.md
+
+# Supabase migrations (não necessárias para o build nativo)
+supabase/
+
+# Scripts utilitários
+scripts/
+
+# Testes
+tests/
+
+# Caches do Expo (regenerados pelo EAS)
+.expo/
+
+# Android caches e artefatos de build anteriores
+android/.gradle/
+android/build/
+android/app/build/
+android/.kotlin/
+
+# Arquivos de cache sem extensão do Metro/Hermes (gerados em runtime)
+android/app/src/main/assets/*.hbc
+android/app/src/main/assets/*.hbc.map
