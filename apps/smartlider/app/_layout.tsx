@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, Clipboard } from 'react-native'
 import { Stack } from 'expo-router'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
+import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { supabase } from '../src/lib/supabase'
 import { useRouter, useSegments } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -154,6 +155,7 @@ export default function RootLayout() {
   }
 
   return (
+    <SafeAreaProvider>
     <GestureHandlerRootView style={{ flex: 1 }}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)"      options={{ headerShown: false }} />
@@ -165,5 +167,6 @@ export default function RootLayout() {
         <Stack.Screen name="diagnostico" options={{ headerShown: false }} />
       </Stack>
     </GestureHandlerRootView>
+    </SafeAreaProvider>
   )
 }

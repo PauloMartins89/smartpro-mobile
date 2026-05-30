@@ -36,12 +36,8 @@ export default function TabsLayout() {
 
   if (!turnoAtivo) return null
 
-  // Android 15+ força edge-to-edge (targetSdkVersion 36): insets.bottom pode ser 0
-  // mesmo com barra de navegação visível. Garante mínimo de 48dp (altura da nav bar 3-botões).
-  const bottomInset = Platform.OS === 'android' ? Math.max(insets.bottom, 48) : insets.bottom
-
   return (
-    <View style={{ flex: 1, paddingBottom: bottomInset }}>
+    <View style={{ flex: 1, paddingBottom: insets.bottom }}>
       {/* Barra de contexto persistente */}
       <View style={styles.contextBar}>
         <View style={styles.contextLeft}>
