@@ -151,7 +151,7 @@ export default function InsumoApontamentoScreen() {
       )}
 
       <Modal visible={showForm} animationType="slide" transparent>
-        <View style={[s.overlay, { paddingBottom: insets.bottom }]}>
+        <View style={[s.overlay, { paddingBottom: Math.max(insets.bottom, 24) }]}>
           <View style={s.modal}>
             <View style={s.modalHdr}>
               <Text style={s.modalTitle}>Novo Apontamento de Insumo</Text>
@@ -221,6 +221,6 @@ const s = StyleSheet.create({
   chipTx:      { fontSize: 12, fontWeight: '600', color: C.textSub },
   chipTxOn:    { color: '#fff' },
   input:       { backgroundColor: C.bgMuted, borderRadius: 10, padding: 12, fontSize: 14, color: C.text, borderWidth: 1, borderColor: C.border },
-  saveBtn:     { backgroundColor: C.primary, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 8 },
+  saveBtn:     { backgroundColor: C.primary, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 8, marginBottom: 20 },
   saveTx:      { color: '#fff', fontWeight: '800', fontSize: 15 },
 })

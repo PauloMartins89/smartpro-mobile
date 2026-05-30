@@ -244,7 +244,7 @@ export default function MaoDeObraScreen() {
 
       {/* ── Modal: Registrar Falta ── */}
       <Modal visible={showAddModal} animationType="slide" transparent>
-        <View style={s.overlay}>
+        <View style={[s.overlay, { paddingBottom: Math.max(insets.bottom, 24) }]}>
           <View style={[s.modal, { maxHeight: '96%' }]}>
 
             {/* Header */}
@@ -438,7 +438,7 @@ export default function MaoDeObraScreen() {
 
       {/* ── Modal: Picker de colaborador ── */}
       <Modal visible={showColabPicker} animationType="slide" transparent>
-        <View style={s.overlay}>
+        <View style={[s.overlay, { paddingBottom: Math.max(insets.bottom, 24) }]}>
           <View style={[s.modal, { maxHeight: '80%' }]}>
             <View style={s.modalHdr}>
               <Text style={s.modalTitle}>Selecionar Colaborador</Text>
@@ -626,7 +626,7 @@ const s = StyleSheet.create({
   colabNomeInline:     { flex: 1, fontSize: 14, fontWeight: '600', color: C.text },
   statusPill:          { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
   motivoInput:         { backgroundColor: C.redBg, borderRadius: 8, padding: 10, fontSize: 13, color: C.text, marginTop: 4, marginBottom: 4, marginLeft: 42, borderWidth: 1, borderColor: '#FECACA' },
-  saveBtn:             { backgroundColor: C.primary, borderRadius: 14, padding: 17, alignItems: 'center', marginTop: 8 },
+  saveBtn:             { backgroundColor: C.primary, borderRadius: 14, padding: 17, alignItems: 'center', marginTop: 8, marginBottom: 20 },
   saveTx:              { color: '#fff', fontWeight: '800', fontSize: 15 },
   row:                 { flexDirection: 'row', alignItems: 'center', backgroundColor: C.bgCard, borderRadius: 12, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: C.border },
   rowTitle:            { fontSize: 14, fontWeight: '700', color: C.text },
