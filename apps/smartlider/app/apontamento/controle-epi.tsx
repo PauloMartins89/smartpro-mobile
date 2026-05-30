@@ -171,7 +171,7 @@ export default function ControleEpiScreen() {
                 <Ionicons name="close" size={22} color={C.textSub} />
               </TouchableOpacity>
             </View>
-            <ScrollView contentContainerStyle={{ padding: 20 }}>
+            <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
               <Section label="Colaborador *">
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   {colaboradores.map(c => (

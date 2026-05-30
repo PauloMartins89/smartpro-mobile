@@ -182,7 +182,7 @@ export default function AfericaoScreen() {
                 <Ionicons name="close" size={22} color={C.textSub} />
               </TouchableOpacity>
             </View>
-            <ScrollView contentContainerStyle={{ padding: 20 }}>
+            <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
               <Section label="Maquina *">
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   {maquinas.map(m => (

@@ -138,7 +138,7 @@ export default function ProdutividadeEquipeScreen() {
                 <Ionicons name="close" size={22} color={C.textSub} />
               </TouchableOpacity>
             </View>
-            <ScrollView contentContainerStyle={{ padding: 20 }}>
+            <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
               <Section label="Atividade realizada *">
                 <TextInput style={s.input} value={atividade} onChangeText={setAtiv} placeholder="Ex: Pulverizacao, Plantio..." placeholderTextColor={C.textMuted} />
               </Section>

@@ -1,4 +1,4 @@
-ï»¿// @ts-nocheck
+// @ts-nocheck
 import { useEffect, useState, useCallback } from 'react'
 import {
   View, Text, StyleSheet, ScrollView, FlatList,
@@ -57,7 +57,7 @@ export default function InsumoApontamentoScreen() {
       .order('created_at', { ascending: false })
     setRecords((data ?? []).map(r => ({
       id: r.id,
-      produto_nome: r.lider_produtos?.nome ?? 'â€”',
+      produto_nome: r.lider_produtos?.nome ?? '—',
       quantidade: r.quantidade,
       unidade: r.unidade,
       status: r.status ?? 'enviado',
@@ -85,8 +85,8 @@ export default function InsumoApontamentoScreen() {
 
   async function handleSalvar() {
     if (!turnoAtivo) return
-    if (!produto)   { Alert.alert('AtenÃ§Ã£o', 'Selecione o produto'); return }
-    if (!quantidade){ Alert.alert('AtenÃ§Ã£o', 'Informe a quantidade'); return }
+    if (!produto)   { Alert.alert('Atenção', 'Selecione o produto'); return }
+    if (!quantidade){ Alert.alert('Atenção', 'Informe a quantidade'); return }
     setSaving(true)
     const { data: user } = await supabase.auth.getUser()
     const id = uuidv4()
@@ -103,7 +103,7 @@ export default function InsumoApontamentoScreen() {
     } catch {
       addToQueue({ id, table: 'lider_apontamentos_insumo', action: 'insert', payload, created_at: new Date().toISOString() })
       setRecords(prev => [{ id, produto_nome: produto.nome, quantidade: parseFloat(quantidade), unidade: produto.unidade, status, created_at: new Date().toISOString(), sync_status: 'pending' }, ...prev])
-      Alert.alert('Salvo offline', 'SerÃ¡ sincronizado quando a conexÃ£o voltar.')
+      Alert.alert('Salvo offline', 'Será sincronizado quando a conexão voltar.')
     } finally {
       setSaving(false); setShowForm(false)
       setProduto(null); setQtd(''); setArea(''); setObs(''); setStatus('enviado')
@@ -117,12 +117,12 @@ export default function InsumoApontamentoScreen() {
         contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 14, gap: 0 }}>
         <StatCard label="Insumos hoje"  value={hoje.length}          icon="flask-outline"         color={C.primary} bg={C.greenBg} />
         <StatCard label="Qtd. total"    value={totalQtd.toFixed(1)}  icon="cube-outline"          color={C.blue}    bg={C.blueBg}  />
-        <StatCard label="DivergÃªncias"  value={divergentes}          icon="warning-outline"       color={C.red}     bg={C.redBg}   />
+        <StatCard label="Divergências"  value={divergentes}          icon="warning-outline"       color={C.red}     bg={C.redBg}   />
         <StatCard label="Offline"       value={pendentes}            icon="cloud-offline-outline" color={C.yellow}  bg={C.yellowBg}/>
       </ScrollView>
 
       <View style={s.actionRow}>
-        <Text style={s.sectionTitle}>HistÃ³rico do turno</Text>
+        <Text style={s.sectionTitle}>Histórico do turno</Text>
         <TouchableOpacity style={s.newBtn} onPress={() => setShowForm(true)}>
           <Ionicons name="add" size={16} color="#fff" />
           <Text style={s.newBtnText}>Novo</Text>
@@ -139,7 +139,7 @@ export default function InsumoApontamentoScreen() {
             <View style={s.row}>
               <View style={{ flex: 1 }}>
                 <Text style={s.rowTitle}>{item.produto_nome}</Text>
-                <Text style={s.rowSub}>{item.quantidade} {item.unidade} Â· {fmtDate(item.created_at?.split('T')[0])}</Text>
+                <Text style={s.rowSub}>{item.quantidade} {item.unidade} · {fmtDate(item.created_at?.split('T')[0])}</Text>
               </View>
               <View style={{ alignItems: 'flex-end', gap: 4 }}>
                 <StatusChip status={item.status} size="sm" />
@@ -159,7 +159,7 @@ export default function InsumoApontamentoScreen() {
                 <Ionicons name="close" size={22} color={C.textSub} />
               </TouchableOpacity>
             </View>
-            <ScrollView contentContainerStyle={{ padding: 20 }}>
+            <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
               <Section label="Produto *">
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   {produtos.map(p => (
@@ -176,7 +176,7 @@ export default function InsumoApontamentoScreen() {
                   </Section>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Section label="Ãrea (ha)">
+                  <Section label="Área (ha)">
                     <TextInput style={s.input} value={area} onChangeText={setArea} keyboardType="decimal-pad" placeholder="0.0" placeholderTextColor={C.textMuted} />
                   </Section>
                 </View>
@@ -190,7 +190,7 @@ export default function InsumoApontamentoScreen() {
                   ))}
                 </View>
               </Section>
-              <Section label="ObservaÃ§Ã£o">
+              <Section label="Observação">
                 <TextInput style={[s.input, { height: 70, textAlignVertical: 'top' }]} value={obs} onChangeText={setObs} multiline placeholder="Obs..." placeholderTextColor={C.textMuted} />
               </Section>
               <TouchableOpacity style={s.saveBtn} onPress={handleSalvar} disabled={saving}>

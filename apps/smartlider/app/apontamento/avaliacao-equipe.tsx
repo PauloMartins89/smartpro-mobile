@@ -156,7 +156,7 @@ export default function AvaliacaoEquipeScreen() {
                 <Ionicons name="close" size={22} color={C.textSub} />
               </TouchableOpacity>
             </View>
-            <ScrollView contentContainerStyle={{ padding: 20 }}>
+            <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
               {CRITERIOS.map(({ key, label }) => (
                 <View key={key} style={{ marginBottom: 20 }}>
                   <Text style={{ fontSize: 13, fontWeight: '700', color: C.textSub, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>{label}</Text>

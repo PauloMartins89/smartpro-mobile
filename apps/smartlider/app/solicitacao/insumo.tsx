@@ -148,7 +148,7 @@ export default function SolicitacaoInsumoScreen() {
                 <Ionicons name="close" size={22} color={C.textSub} />
               </TouchableOpacity>
             </View>
-            <ScrollView contentContainerStyle={{ padding: 20 }}>
+            <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
               <Section label="Produto *">
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   {produtos.map(p => (

@@ -180,7 +180,7 @@ function KpiCard({ icon, label, value, sub, color, iconBg, pct }: {
 
 const st = StyleSheet.create({
   root:  { flex: 1, backgroundColor: C.bg },
-  scroll: { padding: 16, paddingTop: 20 },
+  scroll: { padding: 16, paddingTop: 20, paddingBottom: 90 },
 
   // Section headers
   sectionHeader:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
