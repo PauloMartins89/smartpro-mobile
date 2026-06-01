@@ -15,7 +15,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../../src/lib/supabase'
 import { C } from '../../src/lib/theme'
 
-const SCREEN_W  = Dimensions.get('window').width
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window')
 const LOCAL_DIR = (FileSystem.cacheDirectory ?? '') + 'mapas/'
 const localPath = (id) => LOCAL_DIR + id + '.png'
 
@@ -119,6 +119,10 @@ export default function MapaViewerScreen() {
   const trajetoRef  = useRef([])
   const modoRef     = useRef('linha')
   const baseScaleRef = useRef(1)
+  const hScrollRef   = useRef(null)
+  const vScrollRef   = useRef(null)
+  const scrollXRef   = useRef(0)
+  const scrollYRef   = useRef(0)
 
   // ── UI modals ────────────────────────────────────────────────────
   const [menuOpen,    setMenuOpen]    = useState(false)
@@ -389,8 +393,30 @@ export default function MapaViewerScreen() {
   useEffect(() => () => locSub.current?.remove(), [])
 
   // ── Zoom helpers ──────────────────────────────────────────────────────────
-  const zoomIn  = () => setScale(s => { const n = Math.min(s + 0.5, 4);  baseScaleRef.current = n; return n })
-  const zoomOut = () => setScale(s => { const n = Math.max(s - 0.5, 0.5); baseScaleRef.current = n; return n })
+  const scrollToCenter = (newScale: number, oldScale: number, focalX = SCREEN_W / 2, focalY = SCREEN_H / 2) => {
+    const ratio = newScale / oldScale
+    const newX  = Math.max(0, (scrollXRef.current + focalX) * ratio - focalX)
+    const newY  = Math.max(0, (scrollYRef.current + focalY) * ratio - focalY)
+    setTimeout(() => {
+      hScrollRef.current?.scrollTo({ x: newX, animated: false })
+      vScrollRef.current?.scrollTo({ y: newY, animated: false })
+    }, 0)
+  }
+
+  const zoomIn  = () => {
+    const oldScale = baseScaleRef.current
+    const n = Math.min(oldScale + 0.5, 4)
+    baseScaleRef.current = n
+    setScale(n)
+    scrollToCenter(n, oldScale)
+  }
+  const zoomOut = () => {
+    const oldScale = baseScaleRef.current
+    const n = Math.max(oldScale - 0.5, 0.5)
+    baseScaleRef.current = n
+    setScale(n)
+    scrollToCenter(n, oldScale)
+  }
 
   const pinchGesture = Gesture.Pinch()
     .runOnJS(true)
@@ -398,6 +424,12 @@ export default function MapaViewerScreen() {
     .onUpdate(e => {
       const next = Math.min(4, Math.max(0.5, baseScaleRef.current * e.scale))
       setScale(next)
+    })
+    .onEnd(e => {
+      const oldScale = baseScaleRef.current
+      const newScale = Math.min(4, Math.max(0.5, oldScale * e.scale))
+      baseScaleRef.current = newScale
+      scrollToCenter(newScale, oldScale, e.focalX, e.focalY)
     })
 
   // ── Loading ───────────────────────────────────────────────────────────────
@@ -442,14 +474,20 @@ export default function MapaViewerScreen() {
       {/* Mapa com GPS overlay */}
       <GestureDetector gesture={pinchGesture}>
       <ScrollView
+        ref={vScrollRef}
         style={st.scroll}
         contentContainerStyle={{ width: mapW, minHeight: mapH }}
         horizontal={false}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        onScroll={e => { scrollYRef.current = e.nativeEvent.contentOffset.y }}
+        scrollEventThrottle={16}>
         <ScrollView
+          ref={hScrollRef}
           horizontal
           contentContainerStyle={{ width: mapW }}
-          showsHorizontalScrollIndicator={false}>
+          showsHorizontalScrollIndicator={false}
+          onScroll={e => { scrollXRef.current = e.nativeEvent.contentOffset.x }}
+          scrollEventThrottle={16}>
           <View style={{ width: mapW, height: mapH }}>
             {/* Imagem do mapa (local cache ou URL) */}
             <Image
