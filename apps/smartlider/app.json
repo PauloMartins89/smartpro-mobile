@@ -2,7 +2,7 @@
   "expo": {
     "name": "SmartLider",
     "slug": "smartlider",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./assets/icon.png",
@@ -16,7 +16,7 @@
     },
     "android": {
       "package": "br.smartpro.smartlider",
-      "versionCode": 5,
+      "versionCode": 6,
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
@@ -31,6 +31,10 @@
     },
     "plugins": [
       "expo-router",
+      ["expo-splash-screen", {
+        "backgroundColor": "#0B1A3B",
+        "dark": { "backgroundColor": "#0B1A3B" }
+      }],
       "expo-font",
       [
         "expo-image-picker",
@@ -75,7 +79,7 @@
       "url": "https://u.expo.dev/1f379ffd-098a-4c7c-aa93-b729ed5dfdda",
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 5000
+      "fallbackToCacheTimeout": 0
     },
     "extra": {
       "router": {},
