@@ -30,7 +30,7 @@ export default function DiagnosticoScreen() {
       .slice().reverse()
       .map(l => `[${l.time}] ${l.level.toUpperCase()} ${l.msg}`)
       .join('\n')
-    await Share.share({ message: texto, title: 'Logs SmartLíder' })
+    await Share.share({ message: texto, title: 'Logs SmartLider' })
   }, [])
 
   const renderItem = ({ item }: { item: LogEntry }) => (

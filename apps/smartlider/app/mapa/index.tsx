@@ -6,7 +6,7 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter, useNavigation } from 'expo-router'
-import * as FileSystem from 'expo-file-system'
+import * as FileSystem from 'expo-file-system/legacy'
 import { supabase } from '../../src/lib/supabase'
 import useLiderStore from '../../src/store/useLiderStore'
 import { C } from '../../src/lib/theme'

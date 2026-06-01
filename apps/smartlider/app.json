@@ -1,11 +1,16 @@
 {
   "expo": {
-    "name": "SmartL�der",
+    "name": "SmartLider",
     "slug": "smartlider",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0B1A3B"
+    },
     "scheme": "smartlider",
     "ios": {
       "supportsTablet": true,
@@ -13,7 +18,7 @@
     },
     "android": {
       "package": "br.smartpro.smartlider",
-      "versionCode": 3,
+      "versionCode": 4,
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",

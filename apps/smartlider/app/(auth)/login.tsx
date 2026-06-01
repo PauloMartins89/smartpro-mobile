@@ -148,7 +148,7 @@ export default function LoginScreen() {
             ) : (
               <>
                 <Ionicons name="log-in-outline" size={22} color="#fff" style={{ marginRight: 10 }} />
-                <Text style={styles.btnText}>Entrar no SmartLíder</Text>
+                <Text style={styles.btnText}>Entrar no SmartLider</Text>
                 <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.7)" style={{ marginLeft: 'auto' }} />
               </>
             )}
@@ -175,7 +175,7 @@ export default function LoginScreen() {
             <View style={styles.dividerLine} />
           </View>
 
-          <Text style={styles.version}>SmartLíder v1.0.0</Text>
+          <Text style={styles.version}>SmartLider v1.0.1</Text>
           <View style={styles.connRow}>
             <Text style={styles.connText}>Operação conectada à </Text>
             <Text style={styles.connBrand}>SmartPro</Text>

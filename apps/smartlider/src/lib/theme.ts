@@ -1,4 +1,4 @@
-// Tokens de design do SmartLíder
+// Tokens de design do SmartLider
 export const C = {
   // Backgrounds
   bg:         '#F8FAFC',

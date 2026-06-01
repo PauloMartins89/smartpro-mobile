@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, Clipboard } from 'react-native'
+import { useEffect, useState, useRef } from 'react'
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, Clipboard, Animated } from 'react-native'
 import { Stack } from 'expo-router'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
@@ -13,7 +13,82 @@ import { initLogger, getLogs } from '../src/lib/logger'
 // Inicia captura de logs o mais cedo possível
 initLogger()
 
-// Error boundary global — captura crashes de render em qualquer rota
+// ── Tela de boot com branding ─────────────────────────────────────────────────
+function BootScreen() {
+  const progress = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    Animated.timing(progress, {
+      toValue: 0.72,
+      duration: 2200,
+      useNativeDriver: false,
+    }).start()
+  }, [])
+  const barWidth = progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] })
+  return (
+    <View style={boot.root}>
+      {/* Logo SmartPro */}
+      <View style={boot.logoRow}>
+        <View style={boot.logoCircle}>
+          <Ionicons name="stats-chart" size={16} color="#22C55E" />
+        </View>
+        <Text style={boot.logoText}>
+          <Text style={boot.logoWhite}>Smart</Text>
+          <Text style={boot.logoGreen}>Pro</Text>
+        </Text>
+      </View>
+
+      {/* Título principal */}
+      <View style={boot.titleRow}>
+        <Text style={boot.titleWhite}>Smart</Text>
+        <Text style={boot.titleGreen}>Lider</Text>
+      </View>
+
+      {/* Tagline */}
+      <View style={boot.tagBar} />
+      <Text style={boot.tagline}>GESTÃO OPERACIONAL INTELIGENTE</Text>
+      <View style={boot.tagBar} />
+
+      {/* Barra de progresso */}
+      <View style={boot.loadingArea}>
+        <Text style={boot.loadingText}>Carregando rotina operacional...</Text>
+        <View style={boot.barBg}>
+          <Animated.View style={[boot.barFill, { width: barWidth }]} />
+        </View>
+      </View>
+
+      {/* Footer */}
+      <View style={boot.footer}>
+        <Ionicons name="globe-outline" size={13} color="#22C55E" />
+        <Text style={boot.footerText}>
+          Operação conectada à{' '}
+          <Text style={boot.footerBrand}>SmartPro</Text>
+        </Text>
+      </View>
+    </View>
+  )
+}
+
+const boot = StyleSheet.create({
+  root:        { flex: 1, backgroundColor: '#0B1A3B', alignItems: 'center', justifyContent: 'center', padding: 32 },
+  logoRow:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 44 },
+  logoCircle:  { width: 34, height: 34, borderRadius: 17, borderWidth: 2, borderColor: '#22C55E', alignItems: 'center', justifyContent: 'center' },
+  logoText:    { fontSize: 17, fontWeight: '700' },
+  logoWhite:   { color: '#fff' },
+  logoGreen:   { color: '#22C55E' },
+  titleRow:    { flexDirection: 'row', alignItems: 'baseline' },
+  titleWhite:  { fontSize: 58, fontWeight: '900', color: '#fff', letterSpacing: -1 },
+  titleGreen:  { fontSize: 58, fontWeight: '900', color: '#22C55E', letterSpacing: -1 },
+  tagBar:      { width: 44, height: 3, backgroundColor: '#22C55E', borderRadius: 2, marginVertical: 14 },
+  tagline:     { color: '#8a9ab0', fontSize: 11, fontWeight: '700', letterSpacing: 3 },
+  loadingArea: { marginTop: 52, width: '100%', alignItems: 'center' },
+  loadingText: { color: '#8a9ab0', fontSize: 13, marginBottom: 14 },
+  barBg:       { width: '78%', height: 4, backgroundColor: '#1a2636', borderRadius: 2, overflow: 'hidden' },
+  barFill:     { height: '100%', backgroundColor: '#22C55E', borderRadius: 2 },
+  footer:      { position: 'absolute', bottom: 40, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  footerText:  { color: '#5a6a7a', fontSize: 13 },
+  footerBrand: { color: '#22C55E', fontWeight: '700' },
+})
+
 export function ErrorBoundary({ error, retry }: { error: Error; retry: () => void }) {
   const logs = getLogs().slice(0, 30)
   const logText = logs.map(l => `[${l.time}][${l.level.toUpperCase()}] ${l.msg}`).join('\n')
@@ -147,11 +222,7 @@ export default function RootLayout() {
   }, [])
 
   if (!ready) {
-    return (
-      <View style={{ flex: 1, backgroundColor: '#0D1B2A', justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#22C55E" />
-      </View>
-    )
+    return <BootScreen />
   }
 
   return (

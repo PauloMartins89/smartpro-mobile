@@ -1,6 +1,6 @@
 // @ts-nocheck
 /**
- * Componentes visuais compartilhados pelos módulos operacionais do SmartLíder.
+ * Componentes visuais compartilhados pelos módulos operacionais do SmartLider.
  * StatCard, StatusChip, SyncBanner, PageHeader, Section, RecordList.
  */
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native'
