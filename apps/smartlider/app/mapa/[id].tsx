@@ -515,7 +515,7 @@ export default function MapaViewerScreen() {
       <ScrollView
         ref={vScrollRef}
         style={st.scroll}
-        contentContainerStyle={{ width: mapW, minHeight: mapH }}
+        contentContainerStyle={{ minHeight: mapH }}
         horizontal={false}
         showsVerticalScrollIndicator={false}
         onScroll={e => { scrollYRef.current = e.nativeEvent.contentOffset.y }}
@@ -523,7 +523,8 @@ export default function MapaViewerScreen() {
         <ScrollView
           ref={hScrollRef}
           horizontal
-          contentContainerStyle={{ width: mapW }}
+          style={{ width: SCREEN_W }}
+          contentContainerStyle={{ width: mapW, minHeight: mapH }}
           showsHorizontalScrollIndicator={false}
           onScroll={e => { scrollXRef.current = e.nativeEvent.contentOffset.x }}
           scrollEventThrottle={16}>
