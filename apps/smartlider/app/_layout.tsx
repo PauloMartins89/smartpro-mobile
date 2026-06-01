@@ -205,18 +205,26 @@ export default function RootLayout() {
     const init = async () => {
       console.log('[Boot] init start')
       // ── Verifica OTA update e aplica imediatamente ─────────────────────────
+      console.log('[OTA] __DEV__:', __DEV__, '| updateId:', (Updates as any).updateId ?? 'embedded')
       if (!__DEV__) {
         try {
+          console.log('[OTA] checkForUpdateAsync...')
           const check = await Updates.checkForUpdateAsync()
+          console.log('[OTA] isAvailable:', check.isAvailable)
           if (check.isAvailable) {
-            console.log('[Boot] update disponivel, baixando...')
+            console.log('[OTA] baixando bundle...')
             await Updates.fetchUpdateAsync()
+            console.log('[OTA] aplicando, reiniciando...')
             await Updates.reloadAsync()  // reinicia o app com novo bundle
             return                        // não continua; reloadAsync vai reiniciar
+          } else {
+            console.log('[OTA] app ja esta atualizado')
           }
         } catch (e: any) {
-          console.warn('[Boot] update check falhou:', e?.message)
+          console.warn('[OTA] ERRO:', e?.message)
         }
+      } else {
+        console.log('[OTA] pulado (DEV mode)')
       }
       try {
         const { data: { session }, error } = await supabase.auth.getSession()

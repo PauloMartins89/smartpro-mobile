@@ -3,6 +3,7 @@ import { useState, useCallback } from 'react'
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Share } from 'react-native'
 import { useNavigation } from 'expo-router'
 import { useEffect } from 'react'
+import * as Updates from 'expo-updates'
 import { getLogs, clearLogs, type LogEntry } from '../src/lib/logger'
 import { C } from '../src/lib/theme'
 
@@ -45,6 +46,15 @@ export default function DiagnosticoScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Info de update */}
+      <View style={styles.updateBox}>
+        <Text style={styles.updateTitle}>OTA Update Info</Text>
+        <Text style={styles.updateLine}>channel: {(Updates as any).channel ?? '—'}</Text>
+        <Text style={styles.updateLine}>runtimeVersion: {(Updates as any).runtimeVersion ?? '—'}</Text>
+        <Text style={styles.updateLine}>updateId: {(Updates as any).updateId ?? 'embedded (APK)'}</Text>
+        <Text style={styles.updateLine}>isEmbedded: {String((Updates as any).isEmbeddedLaunch ?? '—')}</Text>
+      </View>
+
       {/* Barra de ações */}
       <View style={styles.toolbar}>
         <Text style={styles.count}>{logs.length} entradas</Text>
@@ -78,6 +88,10 @@ export default function DiagnosticoScreen() {
 }
 
 const styles = StyleSheet.create({
+  updateBox:   { backgroundColor: '#0D2137', borderBottomWidth: 1, borderBottomColor: '#1e3a5f',
+                 paddingHorizontal: 12, paddingVertical: 8 },
+  updateTitle: { color: '#22C55E', fontSize: 11, fontWeight: '700', marginBottom: 4 },
+  updateLine:  { color: '#8a9ab0', fontSize: 11, fontFamily: 'monospace' },
   container: { flex: 1, backgroundColor: '#0D1117' },
   toolbar:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, borderBottomWidth: 1, borderBottomColor: '#30363D' },
   count:     { color: '#8B949E', fontSize: 12 },
