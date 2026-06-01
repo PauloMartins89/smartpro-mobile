@@ -123,6 +123,8 @@ export default function MapaViewerScreen() {
   const vScrollRef   = useRef(null)
   const scrollXRef   = useRef(0)
   const scrollYRef   = useRef(0)
+  const firstFixRef  = useRef(true)   // reseta ao parar GPS; dispara auto-zoom 1x por sessão
+  const imgSizeRef   = useRef({ w: SCREEN_W, h: SCREEN_W }) // ref para evitar closure stale
 
   // ── UI modals ────────────────────────────────────────────────────
   const [menuOpen,    setMenuOpen]    = useState(false)
@@ -161,6 +163,7 @@ export default function MapaViewerScreen() {
       // Calcula altura proporcional da imagem
       Image.getSize(data.imagem_url, (iw, ih) => {
         const h = (SCREEN_W / iw) * ih
+        imgSizeRef.current = { w: SCREEN_W, h }
         setImgSize({ w: SCREEN_W, h })
       })
       // Verifica cache local
@@ -196,6 +199,24 @@ export default function MapaViewerScreen() {
         const { latitude, longitude, accuracy } = loc.coords
         setGps({ latitude, longitude, accuracy })
         if (mapa) setFora(!dentroDoMapa(latitude, longitude, mapa))
+        // Auto-zoom na primeira posição GPS da sessão
+        if (firstFixRef.current && mapa && dentroDoMapa(latitude, longitude, mapa)) {
+          firstFixRef.current = false
+          const frac = gpsToFrac(latitude, longitude, mapa.sw_lat, mapa.sw_lng, mapa.ne_lat, mapa.ne_lng)
+          const iW = imgSizeRef.current.w
+          const iH = imgSizeRef.current.h
+          const targetScale = Math.max(baseScaleRef.current, 2.5)
+          const pixelX = frac.x * iW * targetScale
+          const pixelY = frac.y * iH * targetScale
+          const newScrollX = Math.max(0, pixelX - SCREEN_W / 2)
+          const newScrollY = Math.max(0, pixelY - SCREEN_H / 2)
+          baseScaleRef.current = targetScale
+          setScale(targetScale)
+          setTimeout(() => {
+            hScrollRef.current?.scrollTo({ x: newScrollX, animated: true })
+            vScrollRef.current?.scrollTo({ y: newScrollY, animated: true })
+          }, 50)
+        }
         if (gravarRef.current) {
           const pt = { lat: latitude, lng: longitude, ts: Date.now() }
           trajetoRef.current = [...trajetoRef.current, pt]
@@ -208,6 +229,7 @@ export default function MapaViewerScreen() {
   const pararGPS = useCallback(() => {
     locSub.current?.remove()
     locSub.current = null
+    firstFixRef.current = true   // próxima sessão GPS fará auto-zoom novamente
     setTracking(false)
     setGps(null)
     setFora(false)
@@ -417,6 +439,23 @@ export default function MapaViewerScreen() {
     setScale(n)
     scrollToCenter(n, oldScale)
   }
+
+  // Centraliza o mapa na posição GPS atual com zoom de navegação
+  const centrarNoGps = useCallback(() => {
+    if (!gps || !mapa) return
+    const frac = gpsToFrac(gps.latitude, gps.longitude, mapa.sw_lat, mapa.sw_lng, mapa.ne_lat, mapa.ne_lng)
+    const targetScale = Math.max(baseScaleRef.current, 2.5)
+    const pixelX = frac.x * imgSize.w * targetScale
+    const pixelY = frac.y * imgSize.h * targetScale
+    const newScrollX = Math.max(0, pixelX - SCREEN_W / 2)
+    const newScrollY = Math.max(0, pixelY - SCREEN_H / 2)
+    baseScaleRef.current = targetScale
+    setScale(targetScale)
+    setTimeout(() => {
+      hScrollRef.current?.scrollTo({ x: newScrollX, animated: true })
+      vScrollRef.current?.scrollTo({ y: newScrollY, animated: true })
+    }, 50)
+  }, [gps, mapa, imgSize])
 
   const pinchGesture = Gesture.Pinch()
     .runOnJS(true)
@@ -629,7 +668,7 @@ export default function MapaViewerScreen() {
       <View style={[st.toolbar, { bottom: insets.bottom + 20 }]}>
         <TouchableOpacity
           style={[st.toolBtn, tracking && st.toolBtnGps]}
-          onPress={tracking ? pararGPS : iniciarGPS}
+          onPress={tracking ? centrarNoGps : iniciarGPS}
           activeOpacity={0.85}>
           <Ionicons name={tracking ? 'locate' : 'locate-outline'} size={22} color={tracking ? '#fff' : C.text} />
         </TouchableOpacity>
@@ -777,6 +816,11 @@ export default function MapaViewerScreen() {
               onPress={() => { setMenuOpen(false); carregarTrajetos(); setTrajModal(true) }} />
             <ActionItem icon="map-outline" label="Ver no Google Maps"
               onPress={abrirGoogleMaps} />
+            {tracking && (
+              <ActionItem icon="locate-outline" label="Parar GPS"
+                color="#ef4444"
+                onPress={() => { pararGPS(); setMenuOpen(false) }} />
+            )}
             {coordPin && (
               <ActionItem icon="close-circle-outline" label="Remover pino do mapa"
                 color="#ef4444"
