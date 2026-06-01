@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, Clipboard, Animated } from 'react-native'
+import * as Updates from 'expo-updates'
 import { Stack } from 'expo-router'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
@@ -194,6 +195,20 @@ export default function RootLayout() {
   useEffect(() => {
     const init = async () => {
       console.log('[Boot] init start')
+      // ── Verifica OTA update e aplica imediatamente ─────────────────────────
+      if (!__DEV__) {
+        try {
+          const check = await Updates.checkForUpdateAsync()
+          if (check.isAvailable) {
+            console.log('[Boot] update disponivel, baixando...')
+            await Updates.fetchUpdateAsync()
+            await Updates.reloadAsync()  // reinicia o app com novo bundle
+            return                        // não continua; reloadAsync vai reiniciar
+          }
+        } catch (e: any) {
+          console.warn('[Boot] update check falhou:', e?.message)
+        }
+      }
       try {
         const { data: { session }, error } = await supabase.auth.getSession()
         if (error) console.warn('[Boot] getSession error:', error.message)
