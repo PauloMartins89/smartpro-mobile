@@ -1,7 +1,11 @@
 import { useEffect, useState, useRef } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, Clipboard, Animated } from 'react-native'
 import * as Updates from 'expo-updates'
+import * as SplashScreen from 'expo-splash-screen'
 import { Stack } from 'expo-router'
+
+// Mantém o splash nativo visível até o React renderizar
+SplashScreen.preventAutoHideAsync().catch(() => {})
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { supabase } from '../src/lib/supabase'
@@ -191,6 +195,11 @@ export default function RootLayout() {
   const setLiderPerfil  = useLiderStore(s => s.setLiderPerfil)
   const setWorkspaceId  = useLiderStore(s => s.setWorkspaceId)
   const [ready, setReady] = useState(false)
+
+  // Oculta o splash nativo assim que o React renderiza (BootScreen assume)
+  useEffect(() => {
+    SplashScreen.hideAsync().catch(() => {})
+  }, [])
 
   useEffect(() => {
     const init = async () => {
