@@ -670,18 +670,18 @@ export default function MapaViewerScreen() {
           style={[st.toolBtn, tracking && st.toolBtnGps]}
           onPress={tracking ? centrarNoGps : iniciarGPS}
           activeOpacity={0.85}>
-          <Ionicons name={tracking ? 'locate' : 'locate-outline'} size={22} color={tracking ? '#fff' : C.text} />
+          <Ionicons name={tracking ? 'locate' : 'locate-outline'} size={22} color='#fff' />
         </TouchableOpacity>
         <View style={st.toolDivider} />
         <TouchableOpacity style={st.toolBtn} onPress={zoomIn} activeOpacity={0.85}>
-          <Ionicons name="add" size={22} color={C.text} />
+          <Ionicons name="add" size={22} color='#fff' />
         </TouchableOpacity>
         <TouchableOpacity style={st.toolBtn} onPress={zoomOut} activeOpacity={0.85}>
-          <Ionicons name="remove" size={22} color={C.text} />
+          <Ionicons name="remove" size={22} color='#fff' />
         </TouchableOpacity>
         <View style={st.toolDivider} />
         <TouchableOpacity style={st.toolBtn} onPress={() => setMenuOpen(true)} activeOpacity={0.85}>
-          <Ionicons name="apps-outline" size={22} color={C.text} />
+          <Ionicons name="apps-outline" size={22} color='#fff' />
         </TouchableOpacity>
         <View style={st.toolDivider} />
         <TouchableOpacity
@@ -691,7 +691,7 @@ export default function MapaViewerScreen() {
           <Ionicons
             name={fullscreen ? 'contract-outline' : 'expand-outline'}
             size={22}
-            color={fullscreen ? C.primary ?? '#4ade80' : C.text}
+            color={fullscreen ? '#4ade80' : '#fff'}
           />
         </TouchableOpacity>
       </View>
@@ -1059,7 +1059,7 @@ const st = StyleSheet.create({
   toolBtn:      { width: 50, height: 50, justifyContent: 'center', alignItems: 'center' },
   toolBtnGps:   { backgroundColor: '#4285F4' },
   toolBtnFull:  { backgroundColor: 'rgba(74,222,128,0.12)' },
-  toolDivider:  { width: 26, height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255,255,255,0.09)' },
+  toolDivider:  { width: 26, height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255,255,255,0.25)' },
 
   // ── Record + Mode pills (esquerda) ────────────────────────────────────────
   recPillWrap:  { position: 'absolute', left: 16, flexDirection: 'row', gap: 8, alignItems: 'flex-end' },
