@@ -109,6 +109,8 @@ export default function MapaViewerScreen() {
   const [gps,      setGps]      = useState(null)     // { latitude, longitude, accuracy }
   const [gpsErr,   setGpsErr]   = useState(null)
   const [tracking, setTracking] = useState(false)
+  const [heading,  setHeading]  = useState<number>(0)  // graus magnéticos
+  const headingSub = useRef(null)
   const [fora,     setFora]     = useState(false)
   const [gravando,  setGravando]  = useState(false)
   const [trajeto,   setTrajeto]   = useState([])      // [{lat, lng, ts}]
@@ -189,6 +191,11 @@ export default function MapaViewerScreen() {
     setTracking(true)
     setGpsErr(null)
 
+    // Inicia bússola
+    headingSub.current = await Location.watchHeadingAsync(h => {
+      setHeading(h.trueHeading >= 0 ? h.trueHeading : h.magHeading)
+    })
+
     locSub.current = await Location.watchPositionAsync(
       {
         accuracy: Location.Accuracy.BestForNavigation,
@@ -231,10 +238,13 @@ export default function MapaViewerScreen() {
   const pararGPS = useCallback(() => {
     locSub.current?.remove()
     locSub.current = null
+    headingSub.current?.remove()
+    headingSub.current = null
     firstFixRef.current = true   // próxima sessão GPS fará auto-zoom novamente
     setTracking(false)
     setGps(null)
     setFora(false)
+    setHeading(0)
     // Para gravação junto com GPS
     gravarRef.current = false
     setGravando(false)
@@ -667,6 +677,26 @@ export default function MapaViewerScreen() {
         </ScrollView>
       </ScrollView>
       </GestureDetector>
+
+      {/* ── Rosa dos ventos ─────────────────────────────────────────────────── */}
+      {tracking && (
+        <View style={[st.compass, { top: (fullscreen ? insets.top : 60) + 12 }]}
+              pointerEvents="none">
+          {/* Círculo externo */}
+          <View style={st.compassRing}>
+            {/* Agulha rotaciona de acordo com o heading */}
+            <View style={[st.compassNeedle, { transform: [{ rotate: `-${heading}deg` }] }]}>
+              {/* Norte = vermelho (cima), Sul = branco (baixo) */}
+              <View style={st.compassN} />
+              <View style={st.compassS} />
+            </View>
+            {/* Letra N fixa */}
+            <View style={[st.compassNLabel, { transform: [{ rotate: `-${heading}deg` }] }]}>
+              <Text style={st.compassNTxt}>N</Text>
+            </View>
+          </View>
+        </View>
+      )}
 
       {/* ── Floating Toolbar (direita) ──────────────────────────────────────── */}
       <View style={[st.toolbar, { bottom: insets.bottom + 20 }]}>
@@ -1102,6 +1132,23 @@ const st = StyleSheet.create({
                  paddingHorizontal: 7, paddingVertical: 3, marginLeft: 2 },
   gpsChipAccTxt: { color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '600',
                    fontVariant: ['tabular-nums'] },
+
+  // ── Rosa dos ventos ───────────────────────────────────────────────────────
+  compass:       { position: 'absolute', right: 80, alignItems: 'center', justifyContent: 'center' },
+  compassRing:   { width: 52, height: 52, borderRadius: 26,
+                   backgroundColor: 'rgba(12,13,18,0.82)',
+                   borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.18)',
+                   alignItems: 'center', justifyContent: 'center',
+                   shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+                   shadowOpacity: 0.5, shadowRadius: 8, elevation: 8 },
+  compassNeedle: { position: 'absolute', alignItems: 'center', width: 8, height: 44,
+                   top: 4 },
+  compassN:      { width: 8, height: 18, backgroundColor: '#ef4444', borderTopLeftRadius: 4,
+                   borderTopRightRadius: 4 },
+  compassS:      { width: 8, height: 18, backgroundColor: 'rgba(255,255,255,0.55)',
+                   borderBottomLeftRadius: 4, borderBottomRightRadius: 4 },
+  compassNLabel: { position: 'absolute', top: 3, alignItems: 'center', width: 14 },
+  compassNTxt:   { color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
 })
 
 // ── Estilos para modals / bottom sheets ────────────────────────────────────
