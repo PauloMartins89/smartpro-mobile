@@ -35,6 +35,19 @@
       "expo-router",
       "expo-font",
       [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0B1A3B",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "dark": {
+            "backgroundColor": "#0B1A3B",
+            "image": "./assets/splash-icon.png"
+          }
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "photosPermission": "Permite selecionar imagens para importar mapas de campo."
