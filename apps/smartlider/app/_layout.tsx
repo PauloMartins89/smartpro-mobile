@@ -78,7 +78,7 @@ function BootScreen({ status, onLayout }: { status: string; onLayout?: () => voi
 }
 
 // ── Tela de Atualização (OTA explícita) ───────────────────────────────────────
-function UpdateScreen() {
+function UpdateScreen({ onLayout }: { onLayout?: () => void }) {
   const prog = useRef(new Animated.Value(0)).current
   useEffect(() => {
     Animated.timing(prog, { toValue: 0.9, duration: 8000, useNativeDriver: false }).start()
@@ -86,7 +86,7 @@ function UpdateScreen() {
   const barW = prog.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] })
 
   return (
-    <View style={boot.root}>
+    <View style={boot.root} onLayout={onLayout}>
       <View style={boot.logoRow}>
         <View style={boot.logoCircle}>
           <Ionicons name="stats-chart" size={16} color="#22C55E" />
@@ -319,7 +319,7 @@ export default function RootLayout() {
 
   // ── FASE updating: tela de atualização explícita ──────────────────────────
   if (phase === 'updating') {
-    return <UpdateScreen />
+    return <UpdateScreen onLayout={onBootLayout} />
   }
 
   // ── FASE ready: app normal ────────────────────────────────────────────────
