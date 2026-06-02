@@ -189,7 +189,7 @@ export default function LoginScreen() {
 const DOT_COLOR = 'rgba(255,255,255,0.04)'
 
 const styles = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: '#0B1929' },
+  root:   { flex: 1, backgroundColor: '#0B1A3B' },
   scroll: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40 },
 
   /* Dots decorativos */
