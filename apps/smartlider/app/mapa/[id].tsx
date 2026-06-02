@@ -197,6 +197,8 @@ export default function MapaViewerScreen() {
       },
       (loc) => {
         const { latitude, longitude, accuracy } = loc.coords
+        // Rejeita localizações por antena celular (accuracy > 300m)
+        if (accuracy > 300) return
         setGps({ latitude, longitude, accuracy })
         if (mapa) setFora(!dentroDoMapa(latitude, longitude, mapa))
         // Auto-zoom na primeira posição GPS da sessão
@@ -727,6 +729,12 @@ export default function MapaViewerScreen() {
       )}
 
       {/* Info GPS — chip premium */}
+      {tracking && !gps && (
+        <View style={[st.gpsChip, { top: fullscreen ? insets.top + 10 : 10 }]}>
+          <View style={[st.gpsChipDot, { backgroundColor: '#f59e0b' }]} />
+          <Text style={st.gpsInfoTxt}>Aguardando sinal GPS...</Text>
+        </View>
+      )}
       {gps && (
         <View style={[st.gpsChip, { top: fora ? 54 : (fullscreen ? insets.top + 10 : 10) }]}>
           <View style={[st.gpsChipDot, { backgroundColor: tracking ? '#4ade80' : '#888' }]} />
