@@ -200,26 +200,29 @@ export default function SolicitarRefeicaoScreen() {
   }, [])
 
   // ── Carrega colaboradores quando equipe muda ──────────────────────────────
-  // Usa refei_colaboradores (fonte unificada via efetivo). Fallback para
-  // lider_colaboradores quando a equipe ainda não tem cadastro em refeições.
+  // Fonte primária: lider_colaboradores (equipe do turno) — mesma fonte de
+  // EPI e mão de obra, garantindo equipe única no app.
+  // Fallback: refei_colaboradores caso lider_colaboradores esteja vazio.
   useEffect(() => {
     const liderEquipeId = liderPerfil?.equipe_id ?? turnoAtivo?.equipe_id
     if (!refeiEquipeId && !liderEquipeId) { setColab([]); setMarcacoes({}); return }
 
     async function loadColabs() {
       let lista: any[] = []
-      if (refeiEquipeId) {
-        const { data } = await supabase.from('refei_colaboradores')
-          .select('id, nome, cargo, efetivo_id')
-          .eq('equipe_id', refeiEquipeId)
+      // 1) Fonte principal: lider_colaboradores (igual EPI / mão de obra)
+      if (liderEquipeId) {
+        const { data } = await supabase.from('lider_colaboradores')
+          .select('id, nome, cargo')
+          .eq('equipe_id', liderEquipeId)
           .eq('ativo', true)
           .order('nome')
         lista = data || []
       }
-      if (lista.length === 0 && liderEquipeId) {
-        const { data } = await supabase.from('lider_colaboradores')
-          .select('id, nome, cargo')
-          .eq('equipe_id', liderEquipeId)
+      // 2) Fallback: refei_colaboradores (quando equipe do turno não tem cadastro)
+      if (lista.length === 0 && refeiEquipeId) {
+        const { data } = await supabase.from('refei_colaboradores')
+          .select('id, nome, cargo, efetivo_id')
+          .eq('equipe_id', refeiEquipeId)
           .eq('ativo', true)
           .order('nome')
         lista = data || []
