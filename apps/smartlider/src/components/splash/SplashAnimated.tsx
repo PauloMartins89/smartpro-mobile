@@ -1,14 +1,12 @@
 /**
- * SplashAnimated — SmartLíder
+ * SplashAnimated v2 — SmartLíder
  * "O líder aponta, a operação responde."
  *
- * Timeline:
- *   0.0s  Header + leader fade-in + background waves
- *   0.4s  Cards surgem em stagger + nucleus idle pulse
- *   1.0s  Toque no tablet → nucleus glow + cards brilham
- *   1.5s  Barra de progresso avança + status alterna
- *   2.1s  Footer aparece
- *   2.5s  Fade-out → onFinish()
+ * Fix v2:
+ *  - Líder movido para ÚLTIMO filho do arena (corrige coluna esquerda sumida no web)
+ *  - Centering via wrapper left:0/right:0 (cross-platform seguro)
+ *  - Ondas mais sutis
+ *  - Núcleo 64dp com ícone maior
  */
 
 import React, { useEffect, useRef, useState } from 'react'
@@ -25,12 +23,14 @@ import { Ionicons } from '@expo/vector-icons'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const { width: SW, height: SH } = Dimensions.get('screen')
+// 'window' retorna viewport no web (screen retorna resolução do monitor)
+const { width: SW, height: SH } = Dimensions.get('window')
 const GREEN  = '#22C55E'
 const BG     = '#0B1A3B'
-const BAR_W  = SW - 64          // barra de progresso: tela - padding
+const CARD_W = Math.min(SW * 0.38, 148)
+const BAR_W  = SW - 64
 
-// ─── Status texts ─────────────────────────────────────────────────────────────
+// ─── Statuses ─────────────────────────────────────────────────────────────────
 
 const STATUSES = [
   'Sincronizando apontamentos...',
@@ -50,18 +50,18 @@ type CardDef = {
 }
 
 const LEFT_CARDS: CardDef[] = [
-  { id: 'mao', title: 'Mão de Obra',   sub: 'Apontar equipe',  icon: 'people-outline',         floatAmp: -5, floatDur: 2200 },
-  { id: 'ins', title: 'Insumo',        sub: 'Registrar uso',   icon: 'cube-outline',            floatAmp:  4, floatDur: 2600 },
-  { id: 'ref', title: 'Refeição',      sub: 'Solicitar',       icon: 'restaurant-outline',      floatAmp: -4, floatDur: 2400 },
+  { id: 'mao', title: 'Mão de Obra',   sub: 'Apontar equipe',  icon: 'people-outline',      floatAmp: -5, floatDur: 2200 },
+  { id: 'ins', title: 'Insumo',        sub: 'Registrar uso',   icon: 'cube-outline',         floatAmp:  4, floatDur: 2600 },
+  { id: 'ref', title: 'Refeição',      sub: 'Solicitar',       icon: 'restaurant-outline',   floatAmp: -4, floatDur: 2400 },
 ]
 
 const RIGHT_CARDS: CardDef[] = [
-  { id: 'maq', title: 'Máquina',       sub: 'Apontar uso',     icon: 'construct-outline',       floatAmp:  5, floatDur: 2000 },
-  { id: 'afe', title: 'Aferição',      sub: 'Registrar dados', icon: 'speedometer-outline',     floatAmp: -5, floatDur: 2800 },
-  { id: 'pro', title: 'Produtividade', sub: 'Acompanhar',      icon: 'trending-up-outline',     floatAmp:  4, floatDur: 2300 },
+  { id: 'maq', title: 'Máquina',       sub: 'Apontar uso',     icon: 'construct-outline',    floatAmp:  5, floatDur: 2000 },
+  { id: 'afe', title: 'Aferição',      sub: 'Registrar dados', icon: 'speedometer-outline',  floatAmp: -5, floatDur: 2800 },
+  { id: 'pro', title: 'Produtividade', sub: 'Acompanhar',      icon: 'trending-up-outline',  floatAmp:  4, floatDur: 2300 },
 ]
 
-// ─── AnimatedBackground — horizontal data-flow lines ─────────────────────────
+// ─── Background wave lines ───────────────────────────────────────────────────
 
 function WaveLine({ top, opacity, dur, delay, lineW }: {
   top: number; opacity: number; dur: number; delay: number; lineW: number
@@ -70,9 +70,7 @@ function WaveLine({ top, opacity, dur, delay, lineW }: {
   useEffect(() => {
     const run = () => {
       x.setValue(-lineW)
-      RNAnimated.timing(x, {
-        toValue: SW + lineW, duration: dur, delay, useNativeDriver: true,
-      }).start(run)
+      RNAnimated.timing(x, { toValue: SW + lineW, duration: dur, delay, useNativeDriver: true }).start(run)
     }
     run()
     return () => x.stopAnimation()
@@ -87,17 +85,15 @@ function WaveLine({ top, opacity, dur, delay, lineW }: {
   )
 }
 
-const WAVE_CONFIG = [
-  { top: SH * 0.10, opacity: 0.055, dur: 4200, delay:   0, lineW: SW * 1.4 },
-  { top: SH * 0.24, opacity: 0.040, dur: 5800, delay: 600, lineW: SW * 1.2 },
-  { top: SH * 0.38, opacity: 0.065, dur: 3600, delay: 200, lineW: SW * 1.6 },
-  { top: SH * 0.53, opacity: 0.045, dur: 6200, delay: 800, lineW: SW * 1.3 },
-  { top: SH * 0.67, opacity: 0.035, dur: 4800, delay: 400, lineW: SW * 1.1 },
-  { top: SH * 0.80, opacity: 0.050, dur: 5100, delay: 100, lineW: SW * 1.5 },
-  { top: SH * 0.91, opacity: 0.040, dur: 3900, delay: 300, lineW: SW * 1.7 },
+const WAVES = [
+  { top: SH * 0.20, opacity: 0.10, dur: 4200, delay:   0, lineW: SW * 1.4 },
+  { top: SH * 0.38, opacity: 0.07, dur: 5800, delay: 600, lineW: SW * 1.2 },
+  { top: SH * 0.55, opacity: 0.12, dur: 3600, delay: 200, lineW: SW * 1.6 },
+  { top: SH * 0.70, opacity: 0.08, dur: 6200, delay: 800, lineW: SW * 1.3 },
+  { top: SH * 0.85, opacity: 0.09, dur: 4800, delay: 400, lineW: SW * 1.1 },
 ]
 
-// ─── NucleusCore — ícone central com pulso ────────────────────────────────────
+// ─── NucleusCore ─────────────────────────────────────────────────────────────
 
 function NucleusCore({ pulseSV }: { pulseSV: Animated.SharedValue<number> }) {
   const ring1 = useSharedValue(0)
@@ -106,7 +102,6 @@ function NucleusCore({ pulseSV }: { pulseSV: Animated.SharedValue<number> }) {
   const glow  = useSharedValue(0)
 
   useEffect(() => {
-    // Idle pulse rings (início suave após cards aparecerem)
     ring1.value = withDelay(800, withRepeat(withSequence(
       withTiming(1, { duration: 1400, easing: Easing.out(Easing.quad) }),
       withTiming(0, { duration: 0 }),
@@ -115,37 +110,29 @@ function NucleusCore({ pulseSV }: { pulseSV: Animated.SharedValue<number> }) {
       withTiming(1, { duration: 1400, easing: Easing.out(Easing.quad) }),
       withTiming(0, { duration: 0 }),
     ), -1))
-    // Slow spin no ícone interno
-    spin.value = withRepeat(
-      withTiming(360, { duration: 10000, easing: Easing.linear }), -1,
-    )
+    spin.value = withRepeat(withTiming(360, { duration: 10000, easing: Easing.linear }), -1)
   }, [])
 
-  // Reage ao toque do tablet
   useAnimatedReaction(
     () => pulseSV.value,
     (cur, prev) => {
       if (cur > 0.5 && (!prev || prev < 0.5)) {
-        glow.value = withSequence(
-          withTiming(1, { duration: 240 }),
-          withTiming(0, { duration: 580 }),
-        )
+        glow.value = withSequence(withTiming(1, { duration: 240 }), withTiming(0, { duration: 580 }))
       }
     },
   )
 
   const r1Style = useAnimatedStyle(() => ({
-    opacity: interpolate(ring1.value, [0, 0.3, 1], [0.35, 0.55, 0])
-           + glow.value * 0.6,
-    transform: [{ scale: 1 + ring1.value * 1.3 + glow.value * 0.5 }],
+    opacity: interpolate(ring1.value, [0, 0.3, 1], [0.35, 0.55, 0]) + glow.value * 0.5,
+    transform: [{ scale: 1 + ring1.value * 1.3 + glow.value * 0.4 }],
   }))
   const r2Style = useAnimatedStyle(() => ({
     opacity: interpolate(ring2.value, [0, 0.3, 1], [0.2, 0.35, 0]),
     transform: [{ scale: 1 + ring2.value * 2.1 }],
   }))
   const glowRingStyle = useAnimatedStyle(() => ({
-    opacity: glow.value * 1.0,
-    transform: [{ scale: 1 + glow.value * 2.2 }],
+    opacity: glow.value,
+    transform: [{ scale: 1 + glow.value * 2 }],
   }))
   const spinStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${spin.value}deg` }],
@@ -158,7 +145,7 @@ function NucleusCore({ pulseSV }: { pulseSV: Animated.SharedValue<number> }) {
       <Animated.View style={[nc.ring, nc.glowRing, glowRingStyle]} />
       <View style={nc.core}>
         <Animated.View style={spinStyle}>
-          <Ionicons name="stats-chart" size={22} color={GREEN} />
+          <Ionicons name="stats-chart" size={26} color={GREEN} />
         </Animated.View>
       </View>
     </View>
@@ -166,15 +153,14 @@ function NucleusCore({ pulseSV }: { pulseSV: Animated.SharedValue<number> }) {
 }
 
 const nc = StyleSheet.create({
-  wrap:     { width: 56, height: 56, alignItems: 'center', justifyContent: 'center', zIndex: 5 },
-  ring:     { position: 'absolute', width: 56, height: 56, borderRadius: 28, borderWidth: 1.5, borderColor: 'rgba(34,197,94,0.45)' },
+  wrap:     { width: 64, height: 64, alignItems: 'center', justifyContent: 'center', zIndex: 8 },
+  ring:     { position: 'absolute', width: 64, height: 64, borderRadius: 32, borderWidth: 1.5, borderColor: 'rgba(34,197,94,0.45)' },
   glowRing: { borderColor: GREEN, borderWidth: 2 },
   core:     {
-    width: 56, height: 56, borderRadius: 28,
+    width: 64, height: 64, borderRadius: 32,
     borderWidth: 2, borderColor: GREEN,
-    backgroundColor: 'rgba(34,197,94,0.1)',
+    backgroundColor: 'rgba(34,197,94,0.12)',
     alignItems: 'center', justifyContent: 'center',
-    elevation: 8,
   },
 })
 
@@ -184,30 +170,24 @@ function FloatingCard({ title, sub, icon, floatAmp, floatDur, delay, pulseSV }: 
   delay: number; pulseSV: Animated.SharedValue<number>
 }) {
   const opacity    = useSharedValue(0)
-  const translateY = useSharedValue(floatAmp > 0 ? floatAmp : -floatAmp)
+  const translateY = useSharedValue(Math.abs(floatAmp))
   const glowVal    = useSharedValue(0)
 
   useEffect(() => {
     opacity.value = withDelay(delay, withTiming(1, { duration: 380 }))
-    translateY.value = withDelay(delay + 280,
-      withRepeat(
-        withSequence(
-          withTiming( floatAmp, { duration: floatDur / 2, easing: Easing.inOut(Easing.sin) }),
-          withTiming(-floatAmp, { duration: floatDur / 2, easing: Easing.inOut(Easing.sin) }),
-        ),
-        -1, true,
-      ),
-    )
+    translateY.value = withDelay(delay + 280, withRepeat(
+      withSequence(
+        withTiming( floatAmp, { duration: floatDur / 2, easing: Easing.inOut(Easing.sin) }),
+        withTiming(-floatAmp, { duration: floatDur / 2, easing: Easing.inOut(Easing.sin) }),
+      ), -1, true,
+    ))
   }, [])
 
   useAnimatedReaction(
     () => pulseSV.value,
     (cur, prev) => {
       if (cur > 0.5 && (!prev || prev < 0.5)) {
-        glowVal.value = withSequence(
-          withTiming(1, { duration: 200 }),
-          withTiming(0, { duration: 450 }),
-        )
+        glowVal.value = withSequence(withTiming(1, { duration: 200 }), withTiming(0, { duration: 450 }))
       }
     },
   )
@@ -215,63 +195,56 @@ function FloatingCard({ title, sub, icon, floatAmp, floatDur, delay, pulseSV }: 
   const cardStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
     transform: [{ translateY: translateY.value }],
-    borderColor: `rgba(34,197,94,${0.18 + glowVal.value * 0.72})`,
+    borderColor: `rgba(34,197,94,${0.2 + glowVal.value * 0.7})`,
   }))
 
   const iconBgStyle = useAnimatedStyle(() => ({
-    backgroundColor: `rgba(34,197,94,${0.10 + glowVal.value * 0.20})`,
+    backgroundColor: `rgba(34,197,94,${0.1 + glowVal.value * 0.2})`,
   }))
 
   return (
-    <Animated.View style={[fcard.card, cardStyle]}>
-      <View style={fcard.row}>
-        <Animated.View style={[fcard.iconWrap, iconBgStyle]}>
-          <Ionicons name={icon} size={13} color={GREEN} />
+    <Animated.View style={[fc.card, cardStyle]}>
+      <View style={fc.row}>
+        <Animated.View style={[fc.iconWrap, iconBgStyle]}>
+          <Ionicons name={icon} size={14} color={GREEN} />
         </Animated.View>
-        <View style={fcard.texts}>
-          <Text style={fcard.title} numberOfLines={1}>{title}</Text>
-          <Text style={fcard.sub} numberOfLines={1}>{sub}</Text>
+        <View style={fc.texts}>
+          <Text style={fc.title} numberOfLines={1}>{title}</Text>
+          <Text style={fc.sub} numberOfLines={1}>{sub}</Text>
         </View>
       </View>
     </Animated.View>
   )
 }
 
-const fcard = StyleSheet.create({
+const fc = StyleSheet.create({
   card: {
-    backgroundColor: 'rgba(8,18,38,0.88)',
-    borderWidth: 1, borderColor: 'rgba(34,197,94,0.2)',
+    width: CARD_W,
+    backgroundColor: 'rgba(8,18,38,0.90)',
+    borderWidth: 1, borderColor: 'rgba(34,197,94,0.22)',
     borderRadius: 10,
-    paddingHorizontal: 9, paddingVertical: 8,
-    width: SW * 0.39,
+    paddingHorizontal: 10, paddingVertical: 9,
     marginBottom: 8,
   },
   row:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  iconWrap: { width: 26, height: 26, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
+  iconWrap: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   texts:    { flex: 1 },
-  title:    { color: '#e8f0f8', fontSize: 11, fontWeight: '700' },
-  sub:      { color: '#3a5572', fontSize: 9, marginTop: 1 },
+  title:    { color: '#e8f0f8', fontSize: 11.5, fontWeight: '700' },
+  sub:      { color: '#3a5572', fontSize: 9.5, marginTop: 1 },
 })
 
-// ─── ProgressBar com shimmer ──────────────────────────────────────────────────
+// ─── Progress bar ─────────────────────────────────────────────────────────────
 
 function ProgressBar({ progressSV }: { progressSV: Animated.SharedValue<number> }) {
   const shimX = useRef(new RNAnimated.Value(-50)).current
-
   useEffect(() => {
-    RNAnimated.loop(
-      RNAnimated.sequence([
-        RNAnimated.timing(shimX, { toValue: BAR_W + 50, duration: 1200, delay: 200, useNativeDriver: true }),
-        RNAnimated.timing(shimX, { toValue: -50, duration: 0, useNativeDriver: true }),
-      ]),
-    ).start()
+    RNAnimated.loop(RNAnimated.sequence([
+      RNAnimated.timing(shimX, { toValue: BAR_W + 50, duration: 1100, delay: 150, useNativeDriver: true }),
+      RNAnimated.timing(shimX, { toValue: -50, duration: 0, useNativeDriver: true }),
+    ])).start()
     return () => shimX.stopAnimation()
   }, [])
-
-  const fillStyle = useAnimatedStyle(() => ({
-    width: BAR_W * progressSV.value,
-  }))
-
+  const fillStyle = useAnimatedStyle(() => ({ width: BAR_W * progressSV.value }))
   return (
     <View style={pb.bg}>
       <Animated.View style={[pb.fill, fillStyle]} />
@@ -282,19 +255,19 @@ function ProgressBar({ progressSV }: { progressSV: Animated.SharedValue<number> 
 
 const pb = StyleSheet.create({
   bg:      { width: BAR_W, height: 3, backgroundColor: '#081422', borderRadius: 2, overflow: 'hidden' },
-  fill:    { position: 'absolute', left: 0, top: 0, height: '100%', backgroundColor: GREEN, borderRadius: 2 },
+  fill:    { position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: GREEN, borderRadius: 2 },
   shimmer: { position: 'absolute', top: 0, bottom: 0, width: 50, backgroundColor: 'rgba(34,197,94,0.45)', borderRadius: 2 },
 })
 
-// ─── Main SplashAnimated ──────────────────────────────────────────────────────
+// ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function SplashAnimated({ onFinish }: { onFinish: () => void }) {
   const [statusIdx, setStatusIdx] = useState(0)
 
   const headerOp    = useSharedValue(0)
-  const headerY     = useSharedValue(-18)
+  const headerY     = useSharedValue(-22)
   const leaderOp    = useSharedValue(0)
-  const leaderScale = useSharedValue(0.93)
+  const leaderScale = useSharedValue(0.92)
   const pulseSV     = useSharedValue(0)
   const progressW   = useSharedValue(0)
   const footerOp    = useSharedValue(0)
@@ -304,74 +277,48 @@ export default function SplashAnimated({ onFinish }: { onFinish: () => void }) {
   const changeStatus = (idx: number) => setStatusIdx(idx)
 
   useEffect(() => {
-    // ── 0.0s: Header desliza de cima ───────────────────────────────────────
     headerOp.value = withTiming(1, { duration: 420 })
     headerY.value  = withSpring(0, { damping: 16, stiffness: 110 })
 
-    // ── 0.2s: Líder fade + leve escala ────────────────────────────────────
-    leaderOp.value    = withDelay(180, withTiming(1, { duration: 520 }))
-    leaderScale.value = withDelay(180, withSpring(1, { damping: 18, stiffness: 100 }))
+    leaderOp.value    = withDelay(150, withTiming(1, { duration: 550 }))
+    leaderScale.value = withDelay(150, withSpring(1, { damping: 18, stiffness: 100 }))
 
-    // ── 1.0s: Toque no tablet — pulse geral ───────────────────────────────
     setTimeout(() => {
-      pulseSV.value = withSequence(
-        withTiming(1, { duration: 260 }),
-        withTiming(0, { duration: 540 }),
-      )
+      pulseSV.value = withSequence(withTiming(1, { duration: 260 }), withTiming(0, { duration: 540 }))
     }, 1000)
 
-    // ── 1.5s: Progresso avança até 100% ───────────────────────────────────
-    progressW.value = withDelay(1500,
-      withTiming(1, { duration: 850, easing: Easing.out(Easing.cubic) }),
-    )
+    progressW.value = withDelay(1500, withTiming(1, { duration: 850, easing: Easing.out(Easing.cubic) }))
 
-    // ── Status text alternando com cross-fade ─────────────────────────────
     const crossFade = (idx: number) => {
-      statusOp.value = withSequence(
-        withTiming(0, { duration: 130 }),
-        withTiming(1, { duration: 180 }),
-      )
+      statusOp.value = withSequence(withTiming(0, { duration: 130 }), withTiming(1, { duration: 180 }))
       setTimeout(() => runOnJS(changeStatus)(idx), 130)
     }
     setTimeout(() => crossFade(0), 1500)
     setTimeout(() => crossFade(1), 1950)
     setTimeout(() => crossFade(2), 2250)
 
-    // ── 2.1s: Rodapé ──────────────────────────────────────────────────────
     footerOp.value = withDelay(2100, withTiming(1, { duration: 320 }))
 
-    // ── 2.5s: Fade-out → onFinish ─────────────────────────────────────────
     setTimeout(() => {
-      screenOp.value = withTiming(0, { duration: 280 }, () => {
-        runOnJS(onFinish)()
-      })
+      screenOp.value = withTiming(0, { duration: 280 }, () => runOnJS(onFinish)())
     }, 2500)
   }, [])
 
-  const headerStyle   = useAnimatedStyle(() => ({
-    opacity:   headerOp.value,
-    transform: [{ translateY: headerY.value }],
-  }))
-  const leaderStyle   = useAnimatedStyle(() => ({
-    opacity:   leaderOp.value,
-    transform: [{ scale: leaderScale.value }],
-  }))
-  const footerStyle   = useAnimatedStyle(() => ({ opacity: footerOp.value }))
-  const screenStyle   = useAnimatedStyle(() => ({ opacity: screenOp.value }))
-  const statusStyle   = useAnimatedStyle(() => ({ opacity: statusOp.value }))
-
-  const CARD_DELAY_L = [400, 520, 640]
-  const CARD_DELAY_R = [460, 580, 700]
+  const headerStyle = useAnimatedStyle(() => ({ opacity: headerOp.value, transform: [{ translateY: headerY.value }] }))
+  const leaderStyle = useAnimatedStyle(() => ({ opacity: leaderOp.value, transform: [{ scale: leaderScale.value }] }))
+  const footerStyle = useAnimatedStyle(() => ({ opacity: footerOp.value }))
+  const screenStyle = useAnimatedStyle(() => ({ opacity: screenOp.value }))
+  const statusStyle = useAnimatedStyle(() => ({ opacity: statusOp.value }))
 
   return (
     <Animated.View style={[sa.root, screenStyle]}>
 
-      {/* ── Fundo: ondas de dados ─────────────────────────────────────── */}
-      {WAVE_CONFIG.map((w, i) => (
+      {/* Ondas de fundo */}
+      {WAVES.map((w, i) => (
         <WaveLine key={i} top={w.top} opacity={w.opacity} dur={w.dur} delay={w.delay} lineW={w.lineW} />
       ))}
 
-      {/* ── Header: SmartPro + SmartLíder + tagline ───────────────────── */}
+      {/* Header */}
       <Animated.View style={[sa.header, headerStyle]}>
         <View style={sa.brandRow}>
           <View style={sa.brandCircle}>
@@ -387,48 +334,47 @@ export default function SplashAnimated({ onFinish }: { onFinish: () => void }) {
         <Text style={sa.tagline}>GESTÃO OPERACIONAL INTELIGENTE</Text>
       </Animated.View>
 
-      {/* ── Arena: cards + núcleo + líder ─────────────────────────────── */}
+      {/* Arena ─────────────────────────────────────────────────────────────────
+          Líder como ÚLTIMO filho (absolute) → não quebra o layout flex.
+          Wrapper left:0/right:0 + alignItems:'center' → centragem cross-platform. */}
       <View style={sa.arena}>
 
-        {/* Personagem líder — camada de fundo absoluta ───────────────── */}
-        <Animated.View style={[sa.leaderAbsolute, leaderStyle]}>
-          <Image
-            source={require('../../../assets/lider.jpeg')}
-            style={sa.leaderImg}
-            resizeMode="contain"
-          />
-        </Animated.View>
-
-        {/* Coluna esquerda ────────────────────────────────────────────── */}
+        {/* Coluna esquerda */}
         <View style={sa.col}>
           {LEFT_CARDS.map((c, i) => (
-            <FloatingCard
-              key={c.id} {...c}
-              delay={CARD_DELAY_L[i]}
-              pulseSV={pulseSV}
-            />
+            <FloatingCard key={c.id} {...c} delay={[400, 520, 640][i]} pulseSV={pulseSV} />
           ))}
         </View>
 
-        {/* Centro: núcleo ─────────────────────────────────────────────── */}
+        {/* Núcleo */}
         <View style={sa.centerCol}>
           <NucleusCore pulseSV={pulseSV} />
         </View>
 
-        {/* Coluna direita ─────────────────────────────────────────────── */}
+        {/* Coluna direita */}
         <View style={sa.col}>
           {RIGHT_CARDS.map((c, i) => (
-            <FloatingCard
-              key={c.id} {...c}
-              delay={CARD_DELAY_R[i]}
-              pulseSV={pulseSV}
-            />
+            <FloatingCard key={c.id} {...c} delay={[460, 580, 700][i]} pulseSV={pulseSV} />
           ))}
+        </View>
+
+        {/* Líder — SEMPRE ÚLTIMO: não interfere no flex, centra cross-platform */}
+        <View style={sa.leaderCentering} pointerEvents="none">
+          {/* plain View com bgColor → Animated.View reanimated cria GPU layer transparente no web */}
+          <View style={sa.leaderSizer}>
+            <Animated.View style={[StyleSheet.absoluteFillObject, leaderStyle]}>
+              <Image
+                source={require('../../../assets/lider.png')}
+                style={sa.leaderImg}
+                resizeMode="contain"
+              />
+            </Animated.View>
+          </View>
         </View>
 
       </View>
 
-      {/* ── Barra de progresso + status ───────────────────────────────── */}
+      {/* Progress + status */}
       <View style={sa.progressArea}>
         <Animated.Text style={[sa.statusTxt, statusStyle]}>
           {STATUSES[statusIdx]}
@@ -436,12 +382,11 @@ export default function SplashAnimated({ onFinish }: { onFinish: () => void }) {
         <ProgressBar progressSV={progressW} />
       </View>
 
-      {/* ── Rodapé ────────────────────────────────────────────────────── */}
+      {/* Footer */}
       <Animated.View style={[sa.footer, footerStyle]}>
         <Ionicons name="globe-outline" size={12} color={GREEN} />
         <Text style={sa.footerTxt}>
-          Operação conectada à{' '}
-          <Text style={sa.footerBrand}>SmartPro</Text>
+          Operação conectada à <Text style={sa.footerBrand}>SmartPro</Text>
         </Text>
       </Animated.View>
 
@@ -451,100 +396,84 @@ export default function SplashAnimated({ onFinish }: { onFinish: () => void }) {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const sa = StyleSheet.create({
-  root: {
-    flex: 1, backgroundColor: BG, overflow: 'hidden',
-  },
+const ARENA_H = SH - (SH < 700 ? 230 : 270)
 
-  // Header
+const sa = StyleSheet.create({
+  root: { flex: 1, backgroundColor: BG, overflow: 'hidden' },
+
   header: {
     alignItems: 'center',
-    paddingTop: SH < 700 ? 36 : 48,
-    paddingBottom: 8,
+    paddingTop: SH < 700 ? 32 : 44,
+    paddingBottom: 6,
     zIndex: 10,
   },
-  brandRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8,
-  },
-  brandCircle: {
-    width: 26, height: 26, borderRadius: 13,
-    borderWidth: 1.5, borderColor: GREEN,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  brandTxt: { fontSize: 13, fontWeight: '700' },
-  w: { color: '#fff' },
-  g: { color: GREEN },
-  titleTxt: {
-    fontSize: SH < 700 ? 42 : 50,
-    fontWeight: '900',
-    letterSpacing: -1,
-    lineHeight: SH < 700 ? 46 : 54,
-    marginBottom: 6,
-  },
-  titleW: { color: '#ffffff' },
-  titleG: { color: GREEN },
-  tagline: {
-    color: '#2a4060', fontSize: 10, fontWeight: '700', letterSpacing: 3.5,
-  },
+  brandRow:    { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  brandCircle: { width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: GREEN, alignItems: 'center', justifyContent: 'center' },
+  brandTxt:    { fontSize: 13, fontWeight: '700' },
+  w:           { color: '#ffffff' },
+  g:           { color: GREEN },
+  titleTxt:    { fontSize: SH < 700 ? 40 : 48, fontWeight: '900', letterSpacing: -1, lineHeight: SH < 700 ? 44 : 52, marginBottom: 4 },
+  titleW:      { color: '#ffffff' },
+  titleG:      { color: GREEN },
+  tagline:     { color: '#2a4060', fontSize: 10, fontWeight: '700', letterSpacing: 3.5 },
 
-  // Arena
   arena: {
     flex: 1,
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 6,
+    alignItems: 'stretch',    // colunas ocupam altura total da arena
+    paddingHorizontal: 8,
     position: 'relative',
+    overflow: 'hidden',
   },
   col: {
     flex: 1,
     alignItems: 'center',
+    justifyContent: 'flex-end', // cards na parte inferior da arena (à altura do torso do líder)
+    paddingBottom: 24,
     zIndex: 5,
   },
   centerCol: {
-    width: 66,
+    width: 72,
     alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 6,
+    justifyContent: 'flex-end', // núcleo alinhado com os cards
+    paddingBottom: 24 + 154/2 - 32, // alinha núcleo ao meio vertical dos 3 cards (~77px)
+    zIndex: 8,
   },
 
-  // Líder character — absolute, behind the cards
-  leaderAbsolute: {
+  // Wrapper que cobre todo o arena e centraliza o líder horizontalmente
+  leaderCentering: {
     position: 'absolute',
-    bottom: -SH * 0.02,
-    alignSelf: 'center',
-    width: SW * 0.58,
-    height: SH * 0.42,
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
     zIndex: 2,
+    backgroundColor: BG, // garante que transparência da imagem mostra o fundo correto (web+native)
   },
-  leaderImg: {
-    width: '100%',
-    height: '100%',
+  leaderSizer: {
+    width: SW * 0.72,
+    height: ARENA_H * 0.90,
   },
+  leaderImg: { width: '100%', height: '100%' },
 
-  // Progress area
   progressArea: {
     paddingHorizontal: 32,
     paddingBottom: 10,
     alignItems: 'center',
     zIndex: 10,
   },
-  statusTxt: {
-    color: '#2e4560',
-    fontSize: 11,
-    marginBottom: 8,
-    letterSpacing: 0.2,
-    textAlign: 'center',
-  },
+  statusTxt: { color: '#2e4560', fontSize: 11, marginBottom: 8, letterSpacing: 0.2, textAlign: 'center' },
 
-  // Footer
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingBottom: SH < 700 ? 24 : 32,
+    paddingBottom: SH < 700 ? 22 : 30,
     zIndex: 10,
   },
-  footerTxt: { color: '#2e4560', fontSize: 12 },
+  footerTxt:   { color: '#2e4560', fontSize: 12 },
   footerBrand: { color: GREEN, fontWeight: '700' },
 })
