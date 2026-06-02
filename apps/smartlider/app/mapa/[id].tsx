@@ -523,6 +523,7 @@ export default function MapaViewerScreen() {
         <ScrollView
           ref={hScrollRef}
           horizontal
+          nestedScrollEnabled
           style={{ width: SCREEN_W }}
           contentContainerStyle={{ width: mapW, minHeight: mapH }}
           showsHorizontalScrollIndicator={false}
