@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons'
 import useLiderStore from '../src/store/useLiderStore'
 import type { LiderPerfil } from '../src/store/useLiderStore'
 import { initLogger, getLogs } from '../src/lib/logger'
+import SplashAnimated from '../src/components/splash/SplashAnimated'
 
 initLogger()
 
@@ -245,7 +246,27 @@ export default function RootLayout() {
   const [status, setStatus] = useState('Iniciando...')
   const splashHidden = useRef(false)
 
-  // Oculta splash nativo SOMENTE depois que nossa tela está pintada (onLayout)
+  // Refs de coordenação entre boot() assíncrono e SplashAnimated (2.5s)
+  const splashDoneRef   = useRef(false)
+  const pendingReadyRef = useRef(false)
+  const pendingNavRef   = useRef<(() => void) | null>(null)
+
+  // Oculta splash nativo tão logo nossa tela custom está montada (mesmo BG → sem flash)
+  useEffect(() => {
+    SplashScreen.hideAsync().catch(() => {})
+  }, [])
+
+  // Chamado pelo SplashAnimated quando a animação de 2.5s termina
+  const onSplashFinish = useCallback(() => {
+    splashDoneRef.current = true
+    if (pendingReadyRef.current) {
+      setPhase('ready')
+      pendingNavRef.current?.()
+      pendingNavRef.current = null
+    }
+  }, [])
+
+  // onBootLayout mantido só para UpdateScreen
   const onBootLayout = useCallback(() => {
     if (splashHidden.current) return
     splashHidden.current = true
@@ -289,35 +310,46 @@ export default function RootLayout() {
           setStatus('Carregando perfil...')
         }
 
-        // ── FASE 3: Navegar ───────────────────────────────────────────────────
-        setPhase('ready')
-        const inAuth = segments[0] === '(auth)'
-        if (!session && !inAuth) router.replace('/(auth)/login')
-        if (session  &&  inAuth) router.replace('/(tabs)')
-
-        // Registra listener de auth SOMENTE após boot completo (sem race condition)
-        supabase.auth.onAuthStateChange((_e, sess) => {
-          const isAuth = segments[0] === '(auth)'
-          if (!sess && !isAuth) router.replace('/(auth)/login')
-          if (sess  &&  isAuth) router.replace('/(tabs)')
-          if (sess) fetchAndSetLiderPerfil(sess.user.id, setLiderPerfil)
-        })
+        // ── FASE 3: Navegar (aguarda splash se ainda em andamento) ───────────
+        pendingReadyRef.current = true
+        pendingNavRef.current = () => {
+          const inAuth = segments[0] === '(auth)'
+          if (!session && !inAuth) router.replace('/(auth)/login')
+          if (session  &&  inAuth) router.replace('/(tabs)')
+          // Registra listener de auth SOMENTE após boot completo (sem race condition)
+          supabase.auth.onAuthStateChange((_e, sess) => {
+            const isAuth = segments[0] === '(auth)'
+            if (!sess && !isAuth) router.replace('/(auth)/login')
+            if (sess  &&  isAuth) router.replace('/(tabs)')
+            if (sess) fetchAndSetLiderPerfil(sess.user.id, setLiderPerfil)
+          })
+        }
+        if (splashDoneRef.current) {
+          setPhase('ready')
+          pendingNavRef.current()
+          pendingNavRef.current = null
+        }
       } catch (e: any) {
         console.error('[Boot] erro auth:', e?.message)
-        setPhase('ready')
-        router.replace('/(auth)/login')
+        pendingReadyRef.current = true
+        pendingNavRef.current = () => router.replace('/(auth)/login')
+        if (splashDoneRef.current) {
+          setPhase('ready')
+          pendingNavRef.current()
+          pendingNavRef.current = null
+        }
       }
     }
 
     boot()
   }, [])
 
-  // ── FASE boot: tela de branding com status dinâmico ───────────────────────
+  // ── FASE boot: splash animado premium (2.5s) ────────────────────────────
   if (phase === 'boot') {
-    return <BootScreen status={status} onLayout={onBootLayout} />
+    return <SplashAnimated onFinish={onSplashFinish} />
   }
 
-  // ── FASE updating: tela de atualização explícita ──────────────────────────
+  // ── FASE updating: tela de atualização explícita ─────────────────────────
   if (phase === 'updating') {
     return <UpdateScreen onLayout={onBootLayout} />
   }
