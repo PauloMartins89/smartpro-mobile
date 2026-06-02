@@ -195,6 +195,7 @@ export default function RootLayout() {
   const setLiderPerfil  = useLiderStore(s => s.setLiderPerfil)
   const setWorkspaceId  = useLiderStore(s => s.setWorkspaceId)
   const [ready, setReady] = useState(false)
+  const initDone = useRef(false)
 
   // Oculta o splash nativo assim que o React renderiza (BootScreen assume)
   useEffect(() => {
@@ -204,28 +205,31 @@ export default function RootLayout() {
   useEffect(() => {
     const init = async () => {
       console.log('[Boot] init start')
-      // ── Verifica OTA update e aplica imediatamente ─────────────────────────
-      console.log('[OTA] __DEV__:', __DEV__, '| updateId:', (Updates as any).updateId ?? 'embedded')
+      // ── OTA: verifica em background — NÃO bloqueia o boot ──────────────────
+      // Baixa silenciosamente e aplica na PRÓXIMA abertura do app,
+      // evitando restarts abruptos que aparecem como falha para o usuário.
       if (!__DEV__) {
-        try {
-          console.log('[OTA] checkForUpdateAsync...')
-          const check = await Updates.checkForUpdateAsync()
-          console.log('[OTA] isAvailable:', check.isAvailable)
-          if (check.isAvailable) {
-            console.log('[OTA] baixando bundle...')
-            await Updates.fetchUpdateAsync()
-            console.log('[OTA] aplicando, reiniciando...')
-            await Updates.reloadAsync()  // reinicia o app com novo bundle
-            return                        // não continua; reloadAsync vai reiniciar
-          } else {
-            console.log('[OTA] app ja esta atualizado')
+        ;(async () => {
+          try {
+            console.log('[OTA] check em background...')
+            const check = await Updates.checkForUpdateAsync()
+            if (check.isAvailable) {
+              console.log('[OTA] update disponivel, baixando silenciosamente...')
+              await Updates.fetchUpdateAsync()
+              console.log('[OTA] bundle baixado — sera aplicado na proxima abertura')
+              // NÃO chama reloadAsync() aqui — aplica na próxima abertura
+            } else {
+              console.log('[OTA] app ja esta atualizado')
+            }
+          } catch (e: any) {
+            console.warn('[OTA] ERRO:', e?.message)
           }
-        } catch (e: any) {
-          console.warn('[OTA] ERRO:', e?.message)
-        }
+        })()
       } else {
         console.log('[OTA] pulado (DEV mode)')
       }
+
+      // ── Auth: inicializa sessão ────────────────────────────────────────────
       try {
         const { data: { session }, error } = await supabase.auth.getSession()
         if (error) console.warn('[Boot] getSession error:', error.message)
@@ -238,6 +242,7 @@ export default function RootLayout() {
         console.error('[Boot] CRASH:', e?.message)
         router.replace('/(auth)/login')
       } finally {
+        initDone.current = true
         setReady(true)
         console.log('[Boot] ready')
       }
@@ -245,6 +250,8 @@ export default function RootLayout() {
     init()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      // Ignora disparo imediato enquanto init() ainda está rodando
+      if (!initDone.current) return
       const inAuth = segments[0] === '(auth)'
       if (!session && !inAuth) router.replace('/(auth)/login')
       if (session  &&  inAuth) router.replace('/(tabs)')
