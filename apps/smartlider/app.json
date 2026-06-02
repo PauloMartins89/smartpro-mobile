@@ -64,8 +64,7 @@
           }
         }
       ],
-      ["./plugins/withAbiFilters", { "abiFilters": ["arm64-v8a", "armeabi-v7a"] }],
-      "react-native-reanimated"
+      ["./plugins/withAbiFilters", { "abiFilters": ["arm64-v8a", "armeabi-v7a"] }]
     ],
     "experiments": {
       "typedRoutes": true
