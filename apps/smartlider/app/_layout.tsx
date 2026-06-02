@@ -1,11 +1,12 @@
-import { useEffect, useState, useRef } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, Clipboard, Animated } from 'react-native'
+import { useEffect, useState, useRef, useCallback } from 'react'
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Clipboard, Animated } from 'react-native'
 import * as Updates from 'expo-updates'
 import * as SplashScreen from 'expo-splash-screen'
 import { Stack } from 'expo-router'
 
-// Mantém o splash nativo visível até o React renderizar
+// Mantém o splash nativo visível — só oculta quando nossa tela estiver pintada
 SplashScreen.preventAutoHideAsync().catch(() => {})
+
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { supabase } from '../src/lib/supabase'
@@ -15,23 +16,31 @@ import useLiderStore from '../src/store/useLiderStore'
 import type { LiderPerfil } from '../src/store/useLiderStore'
 import { initLogger, getLogs } from '../src/lib/logger'
 
-// Inicia captura de logs o mais cedo possível
 initLogger()
 
-// ── Tela de boot com branding ─────────────────────────────────────────────────
-function BootScreen() {
-  const progress = useRef(new Animated.Value(0)).current
+// ─────────────────────────────────────────────────────────────────────────────
+// Fases controladas do boot:
+//   'boot'      → tela de branding (carregando / verificando OTA / autenticando)
+//   'updating'  → OTA disponível — mostra tela de atualização explícita
+//   'ready'     → app carregado, renderiza Stack normalmente
+// ─────────────────────────────────────────────────────────────────────────────
+type Phase = 'boot' | 'updating' | 'ready'
+
+// ── Tela de Boot (branding + status) ─────────────────────────────────────────
+function BootScreen({ status, onLayout }: { status: string; onLayout?: () => void }) {
+  const bar = useRef(new Animated.Value(0)).current
   useEffect(() => {
-    Animated.timing(progress, {
-      toValue: 0.72,
-      duration: 2200,
-      useNativeDriver: false,
-    }).start()
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(bar, { toValue: 1, duration: 1400, useNativeDriver: false }),
+        Animated.timing(bar, { toValue: 0, duration: 0,    useNativeDriver: false }),
+      ])
+    ).start()
   }, [])
-  const barWidth = progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] })
+  const barLeft = bar.interpolate({ inputRange: [0, 1], outputRange: ['-40%', '110%'] })
+
   return (
-    <View style={boot.root}>
-      {/* Logo SmartPro */}
+    <View style={boot.root} onLayout={onLayout}>
       <View style={boot.logoRow}>
         <View style={boot.logoCircle}>
           <Ionicons name="stats-chart" size={16} color="#22C55E" />
@@ -42,36 +51,72 @@ function BootScreen() {
         </Text>
       </View>
 
-      {/* Título principal */}
       <View style={boot.titleRow}>
         <Text style={boot.titleWhite}>Smart</Text>
         <Text style={boot.titleGreen}>Lider</Text>
       </View>
 
-      {/* Tagline */}
       <View style={boot.tagBar} />
       <Text style={boot.tagline}>GESTÃO OPERACIONAL INTELIGENTE</Text>
       <View style={boot.tagBar} />
 
-      {/* Barra de progresso */}
       <View style={boot.loadingArea}>
-        <Text style={boot.loadingText}>Carregando rotina operacional...</Text>
+        <Text style={boot.statusText}>{status}</Text>
         <View style={boot.barBg}>
-          <Animated.View style={[boot.barFill, { width: barWidth }]} />
+          <Animated.View style={[boot.shimmer, { left: barLeft }]} />
         </View>
       </View>
 
-      {/* Footer */}
       <View style={boot.footer}>
         <Ionicons name="globe-outline" size={13} color="#22C55E" />
         <Text style={boot.footerText}>
-          Operação conectada à{' '}
-          <Text style={boot.footerBrand}>SmartPro</Text>
+          Operação conectada à <Text style={boot.footerBrand}>SmartPro</Text>
         </Text>
       </View>
     </View>
   )
 }
+
+// ── Tela de Atualização (OTA explícita) ───────────────────────────────────────
+function UpdateScreen() {
+  const prog = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    Animated.timing(prog, { toValue: 0.9, duration: 8000, useNativeDriver: false }).start()
+  }, [])
+  const barW = prog.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] })
+
+  return (
+    <View style={boot.root}>
+      <View style={boot.logoRow}>
+        <View style={boot.logoCircle}>
+          <Ionicons name="stats-chart" size={16} color="#22C55E" />
+        </View>
+        <Text style={boot.logoText}>
+          <Text style={boot.logoWhite}>Smart</Text>
+          <Text style={boot.logoGreen}>Pro</Text>
+        </Text>
+      </View>
+
+      <View style={upd.iconBox}>
+        <Ionicons name="cloud-download-outline" size={48} color="#22C55E" />
+      </View>
+      <Text style={upd.title}>Atualizando SmartLíder</Text>
+      <Text style={upd.sub}>Baixando nova versão...</Text>
+
+      <View style={boot.barBg}>
+        <Animated.View style={[boot.barFill, { width: barW }]} />
+      </View>
+      <Text style={upd.hint}>O app será reiniciado automaticamente</Text>
+    </View>
+  )
+}
+
+const upd = StyleSheet.create({
+  iconBox: { marginBottom: 20 },
+  title:   { color: '#fff',    fontSize: 20, fontWeight: '700', marginBottom: 6 },
+  sub:     { color: '#8a9ab0', fontSize: 14, marginBottom: 24 },
+  hint:    { color: '#5a6a7a', fontSize: 12, marginTop: 16 },
+})
 
 const boot = StyleSheet.create({
   root:        { flex: 1, backgroundColor: '#0B1A3B', alignItems: 'center', justifyContent: 'center', padding: 32 },
@@ -86,9 +131,10 @@ const boot = StyleSheet.create({
   tagBar:      { width: 44, height: 3, backgroundColor: '#22C55E', borderRadius: 2, marginVertical: 14 },
   tagline:     { color: '#8a9ab0', fontSize: 11, fontWeight: '700', letterSpacing: 3 },
   loadingArea: { marginTop: 52, width: '100%', alignItems: 'center' },
-  loadingText: { color: '#8a9ab0', fontSize: 13, marginBottom: 14 },
+  statusText:  { color: '#8a9ab0', fontSize: 13, marginBottom: 14 },
   barBg:       { width: '78%', height: 4, backgroundColor: '#1a2636', borderRadius: 2, overflow: 'hidden' },
   barFill:     { height: '100%', backgroundColor: '#22C55E', borderRadius: 2 },
+  shimmer:     { position: 'absolute', top: 0, bottom: 0, width: '40%', backgroundColor: 'rgba(34,197,94,0.5)', borderRadius: 2 },
   footer:      { position: 'absolute', bottom: 40, flexDirection: 'row', alignItems: 'center', gap: 6 },
   footerText:  { color: '#5a6a7a', fontSize: 13 },
   footerBrand: { color: '#22C55E', fontWeight: '700' },
@@ -190,93 +236,106 @@ async function fetchAndSetLiderPerfil(userId: string, setLiderPerfil: (p: LiderP
 }
 
 export default function RootLayout() {
-  const router          = useRouter()
-  const segments        = useSegments()
-  const setLiderPerfil  = useLiderStore(s => s.setLiderPerfil)
-  const setWorkspaceId  = useLiderStore(s => s.setWorkspaceId)
-  const [ready, setReady] = useState(false)
-  const initDone = useRef(false)
+  const router         = useRouter()
+  const segments       = useSegments()
+  const setLiderPerfil = useLiderStore(s => s.setLiderPerfil)
+  const setWorkspaceId = useLiderStore(s => s.setWorkspaceId)
 
-  // Oculta o splash nativo assim que o React renderiza (BootScreen assume)
-  useEffect(() => {
+  const [phase,  setPhase]  = useState<Phase>('boot')
+  const [status, setStatus] = useState('Iniciando...')
+  const splashHidden = useRef(false)
+
+  // Oculta splash nativo SOMENTE depois que nossa tela está pintada (onLayout)
+  const onBootLayout = useCallback(() => {
+    if (splashHidden.current) return
+    splashHidden.current = true
     SplashScreen.hideAsync().catch(() => {})
   }, [])
 
   useEffect(() => {
-    const init = async () => {
-      console.log('[Boot] init start')
-      // ── OTA: verifica em background — NÃO bloqueia o boot ──────────────────
-      // Baixa silenciosamente e aplica na PRÓXIMA abertura do app,
-      // evitando restarts abruptos que aparecem como falha para o usuário.
+    const boot = async () => {
+      console.log('[Boot] start')
+
+      // ── FASE 1: Verificar OTA ───────────────────────────────────────────────
       if (!__DEV__) {
-        ;(async () => {
-          try {
-            console.log('[OTA] check em background...')
-            const check = await Updates.checkForUpdateAsync()
-            if (check.isAvailable) {
-              console.log('[OTA] update disponivel, baixando silenciosamente...')
-              await Updates.fetchUpdateAsync()
-              console.log('[OTA] bundle baixado — sera aplicado na proxima abertura')
-              // NÃO chama reloadAsync() aqui — aplica na próxima abertura
-            } else {
-              console.log('[OTA] app ja esta atualizado')
-            }
-          } catch (e: any) {
-            console.warn('[OTA] ERRO:', e?.message)
+        try {
+          setStatus('Verificando atualizações...')
+          console.log('[OTA] checkForUpdateAsync...')
+          const check = await Updates.checkForUpdateAsync()
+          console.log('[OTA] isAvailable:', check.isAvailable)
+
+          if (check.isAvailable) {
+            // Mostra tela de atualização explícita — não parece crash
+            setPhase('updating')
+            console.log('[OTA] baixando bundle...')
+            await Updates.fetchUpdateAsync()
+            console.log('[OTA] aplicando...')
+            await Updates.reloadAsync()
+            return // reloadAsync reinicia — não continua aqui
           }
-        })()
-      } else {
-        console.log('[OTA] pulado (DEV mode)')
+        } catch (e: any) {
+          console.warn('[OTA] erro (ignorado):', e?.message)
+        }
       }
 
-      // ── Auth: inicializa sessão ────────────────────────────────────────────
+      // ── FASE 2: Autenticar ─────────────────────────────────────────────────
       try {
-        const { data: { session }, error } = await supabase.auth.getSession()
-        if (error) console.warn('[Boot] getSession error:', error.message)
+        setStatus('Autenticando...')
+        const { data: { session } } = await supabase.auth.getSession()
+        console.log('[Boot] session:', !!session)
+
+        if (session) {
+          await fetchAndSetLiderPerfil(session.user.id, setLiderPerfil)
+          setStatus('Carregando perfil...')
+        }
+
+        // ── FASE 3: Navegar ───────────────────────────────────────────────────
+        setPhase('ready')
         const inAuth = segments[0] === '(auth)'
-        console.log('[Boot] session:', !!session, '| inAuth:', inAuth)
-        if (!session && !inAuth) { console.log('[Boot] -> login'); router.replace('/(auth)/login') }
-        if (session  &&  inAuth) { console.log('[Boot] -> tabs');  router.replace('/(tabs)') }
-        if (session) fetchAndSetLiderPerfil(session.user.id, setLiderPerfil)
+        if (!session && !inAuth) router.replace('/(auth)/login')
+        if (session  &&  inAuth) router.replace('/(tabs)')
+
+        // Registra listener de auth SOMENTE após boot completo (sem race condition)
+        supabase.auth.onAuthStateChange((_e, sess) => {
+          const isAuth = segments[0] === '(auth)'
+          if (!sess && !isAuth) router.replace('/(auth)/login')
+          if (sess  &&  isAuth) router.replace('/(tabs)')
+          if (sess) fetchAndSetLiderPerfil(sess.user.id, setLiderPerfil)
+        })
       } catch (e: any) {
-        console.error('[Boot] CRASH:', e?.message)
+        console.error('[Boot] erro auth:', e?.message)
+        setPhase('ready')
         router.replace('/(auth)/login')
-      } finally {
-        initDone.current = true
-        setReady(true)
-        console.log('[Boot] ready')
       }
     }
-    init()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
-      // Ignora disparo imediato enquanto init() ainda está rodando
-      if (!initDone.current) return
-      const inAuth = segments[0] === '(auth)'
-      if (!session && !inAuth) router.replace('/(auth)/login')
-      if (session  &&  inAuth) router.replace('/(tabs)')
-      if (session) fetchAndSetLiderPerfil(session.user.id, setLiderPerfil)
-    })
-    return () => subscription.unsubscribe()
+    boot()
   }, [])
 
-  if (!ready) {
-    return <BootScreen />
+  // ── FASE boot: tela de branding com status dinâmico ───────────────────────
+  if (phase === 'boot') {
+    return <BootScreen status={status} onLayout={onBootLayout} />
   }
 
+  // ── FASE updating: tela de atualização explícita ──────────────────────────
+  if (phase === 'updating') {
+    return <UpdateScreen />
+  }
+
+  // ── FASE ready: app normal ────────────────────────────────────────────────
   return (
     <SafeAreaProvider>
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)"      options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)"      options={{ headerShown: false }} />
-        <Stack.Screen name="apontamento" options={{ headerShown: false }} />
-        <Stack.Screen name="solicitacao" options={{ headerShown: false }} />
-        <Stack.Screen name="turno/novo"  options={{ presentation: 'modal', headerShown: false }} />
-        <Stack.Screen name="fechamento"  options={{ headerShown: false }} />
-        <Stack.Screen name="diagnostico" options={{ headerShown: false }} />
-      </Stack>
-    </GestureHandlerRootView>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(auth)"      options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)"      options={{ headerShown: false }} />
+          <Stack.Screen name="apontamento" options={{ headerShown: false }} />
+          <Stack.Screen name="solicitacao" options={{ headerShown: false }} />
+          <Stack.Screen name="turno/novo"  options={{ presentation: 'modal', headerShown: false }} />
+          <Stack.Screen name="fechamento"  options={{ headerShown: false }} />
+          <Stack.Screen name="diagnostico" options={{ headerShown: false }} />
+        </Stack>
+      </GestureHandlerRootView>
     </SafeAreaProvider>
   )
 }
