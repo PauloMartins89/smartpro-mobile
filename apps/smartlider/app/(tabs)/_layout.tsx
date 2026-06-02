@@ -39,7 +39,7 @@ export default function TabsLayout() {
 
   // Android 15+ edge-to-edge (targetSdkVersion 36): garante mínimo de 56dp
   const bottomInset = Platform.OS === 'android' ? Math.max(insets.bottom, 56) : insets.bottom
-  const otaId = Updates.currentlyRunning?.updateId?.slice(0, 8) ?? 'embedded'
+  const otaId = Updates.updateId?.slice(0, 8) ?? 'embedded'
 
   return (
     <View style={{ flex: 1, paddingBottom: bottomInset }}>
