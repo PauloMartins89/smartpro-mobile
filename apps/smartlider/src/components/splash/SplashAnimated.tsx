@@ -266,8 +266,8 @@ export default function SplashAnimated({ onFinish }: { onFinish: () => void }) {
 
   const headerOp    = useSharedValue(0)
   const headerY     = useSharedValue(-22)
-  const leaderOp    = useSharedValue(0)
-  const leaderScale = useSharedValue(0.92)
+  const leaderOp    = useSharedValue(1)   // visível desde frame 0 → sem flash na transição
+  const leaderScale = useSharedValue(0.88)
   const pulseSV     = useSharedValue(0)
   const progressW   = useSharedValue(0)
   const footerOp    = useSharedValue(0)
@@ -277,11 +277,12 @@ export default function SplashAnimated({ onFinish }: { onFinish: () => void }) {
   const changeStatus = (idx: number) => setStatusIdx(idx)
 
   useEffect(() => {
-    headerOp.value = withTiming(1, { duration: 420 })
-    headerY.value  = withSpring(0, { damping: 16, stiffness: 110 })
+    // Líder já visível — só anima a escala (spring suave)
+    leaderScale.value = withSpring(1, { damping: 18, stiffness: 100 })
 
-    leaderOp.value    = withDelay(150, withTiming(1, { duration: 550 }))
-    leaderScale.value = withDelay(150, withSpring(1, { damping: 18, stiffness: 100 }))
+    // Header aparece logo após
+    headerOp.value = withTiming(1, { duration: 320 })
+    headerY.value  = withSpring(0, { damping: 16, stiffness: 110 })
 
     setTimeout(() => {
       pulseSV.value = withSequence(withTiming(1, { duration: 260 }), withTiming(0, { duration: 540 }))

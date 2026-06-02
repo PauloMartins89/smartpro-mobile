@@ -7,8 +7,6 @@
     "userInterfaceStyle": "light",
     "icon": "./assets/icon.png",
     "splash": {
-      "image": "./assets/lider.png",
-      "resizeMode": "contain",
       "backgroundColor": "#0B1A3B"
     },
     "scheme": "smartlider",
@@ -38,12 +36,8 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#0B1A3B",
-          "image": "./assets/lider.png",
-          "imageWidth": 280,
-          "resizeMode": "contain",
           "dark": {
-            "backgroundColor": "#0B1A3B",
-            "image": "./assets/lider.png"
+            "backgroundColor": "#0B1A3B"
           }
         }
       ],
