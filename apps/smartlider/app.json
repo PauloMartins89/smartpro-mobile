@@ -2,7 +2,7 @@
   "expo": {
     "name": "SmartLider",
     "slug": "smartlider",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./assets/icon.png",
@@ -18,7 +18,7 @@
     },
     "android": {
       "package": "br.smartpro.smartlider",
-      "versionCode": 7,
+      "versionCode": 8,
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
@@ -64,7 +64,8 @@
           }
         }
       ],
-      ["./plugins/withAbiFilters", { "abiFilters": ["arm64-v8a", "armeabi-v7a"] }]
+      ["./plugins/withAbiFilters", { "abiFilters": ["arm64-v8a", "armeabi-v7a"] }],
+      "react-native-reanimated"
     ],
     "experiments": {
       "typedRoutes": true

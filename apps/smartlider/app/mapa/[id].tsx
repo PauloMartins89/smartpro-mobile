@@ -2,9 +2,12 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import {
   View, Text, StyleSheet, Image, TouchableOpacity,
-  ActivityIndicator, Dimensions, ScrollView, Alert,
+  ActivityIndicator, Dimensions, Alert,
   Modal, TextInput, FlatList, KeyboardAvoidingView, Platform, Linking,
 } from 'react-native'
+import Animated, {
+  useSharedValue, useAnimatedStyle, withSpring, withTiming,
+} from 'react-native-reanimated'
 import { Ionicons } from '@expo/vector-icons'
 import { GestureDetector, Gesture } from 'react-native-gesture-handler'
 import { useLocalSearchParams, useNavigation } from 'expo-router'
@@ -105,7 +108,15 @@ export default function MapaViewerScreen() {
   const [mapa,     setMapa]     = useState(null)
   const [loading,  setLoading]  = useState(true)
   const [imgSize,  setImgSize]  = useState({ w: SCREEN_W, h: SCREEN_W })
-  const [scale,    setScale]    = useState(1)
+  // ── Reanimated transform ──────────────────────────────────────────────────
+  const translateX  = useSharedValue(0)
+  const translateY  = useSharedValue(0)
+  const scaleVal    = useSharedValue(1)
+  const rotationVal = useSharedValue(0)
+  const panSavedX   = useSharedValue(0)
+  const panSavedY   = useSharedValue(0)
+  const savedScale  = useSharedValue(1)
+  const savedRot    = useSharedValue(0)
   const [gps,      setGps]      = useState(null)     // { latitude, longitude, accuracy }
   const [gpsErr,   setGpsErr]   = useState(null)
   const [tracking, setTracking] = useState(false)
@@ -120,11 +131,6 @@ export default function MapaViewerScreen() {
   const gravarRef   = useRef(false)
   const trajetoRef  = useRef([])
   const modoRef     = useRef('linha')
-  const baseScaleRef = useRef(1)
-  const hScrollRef   = useRef(null)
-  const vScrollRef   = useRef(null)
-  const scrollXRef   = useRef(0)
-  const scrollYRef   = useRef(0)
   const firstFixRef  = useRef(true)   // reseta ao parar GPS; dispara auto-zoom 1x por sessão
   const imgSizeRef   = useRef({ w: SCREEN_W, h: SCREEN_W }) // ref para evitar closure stale
 
@@ -214,17 +220,12 @@ export default function MapaViewerScreen() {
           const frac = gpsToFrac(latitude, longitude, mapa.sw_lat, mapa.sw_lng, mapa.ne_lat, mapa.ne_lng)
           const iW = imgSizeRef.current.w
           const iH = imgSizeRef.current.h
-          const targetScale = Math.max(baseScaleRef.current, 2.5)
-          const pixelX = frac.x * iW * targetScale
-          const pixelY = frac.y * iH * targetScale
-          const newScrollX = Math.max(0, pixelX - SCREEN_W / 2)
-          const newScrollY = Math.max(0, pixelY - SCREEN_H / 2)
-          baseScaleRef.current = targetScale
-          setScale(targetScale)
-          setTimeout(() => {
-            hScrollRef.current?.scrollTo({ x: newScrollX, animated: true })
-            vScrollRef.current?.scrollTo({ y: newScrollY, animated: true })
-          }, 50)
+          const targetScale = 2.5
+          const fx = frac.x * iW
+          const fy = frac.y * iH
+          scaleVal.value = withSpring(targetScale, { damping: 18, stiffness: 150 })
+          translateX.value = withSpring(SCREEN_W / 2 - iW / 2 - (fx - iW / 2) * targetScale, { damping: 18, stiffness: 150 })
+          translateY.value = withSpring(SCREEN_H / 2 - iH / 2 - (fy - iH / 2) * targetScale, { damping: 18, stiffness: 150 })
         }
         if (gravarRef.current) {
           const pt = { lat: latitude, lng: longitude, ts: Date.now() }
@@ -240,12 +241,11 @@ export default function MapaViewerScreen() {
     locSub.current = null
     headingSub.current?.remove()
     headingSub.current = null
-    firstFixRef.current = true   // próxima sessão GPS fará auto-zoom novamente
+    firstFixRef.current = true
     setTracking(false)
     setGps(null)
     setFora(false)
     setHeading(0)
-    // Para gravação junto com GPS
     gravarRef.current = false
     setGravando(false)
   }, [])
@@ -426,62 +426,59 @@ export default function MapaViewerScreen() {
 
   useEffect(() => () => locSub.current?.remove(), [])
 
-  // ── Zoom helpers ──────────────────────────────────────────────────────────
-  const scrollToCenter = (newScale: number, oldScale: number, focalX = SCREEN_W / 2, focalY = SCREEN_H / 2) => {
-    const ratio = newScale / oldScale
-    const newX  = Math.max(0, (scrollXRef.current + focalX) * ratio - focalX)
-    const newY  = Math.max(0, (scrollYRef.current + focalY) * ratio - focalY)
-    setTimeout(() => {
-      hScrollRef.current?.scrollTo({ x: newX, animated: false })
-      vScrollRef.current?.scrollTo({ y: newY, animated: false })
-    }, 0)
-  }
+  // ── Gestures (Pan + Pinch + Rotation simultâneos) ────────────────────────
+  const panGesture = Gesture.Pan()
+    .onStart(() => {
+      panSavedX.value = translateX.value
+      panSavedY.value = translateY.value
+    })
+    .onUpdate(e => {
+      translateX.value = panSavedX.value + e.translationX
+      translateY.value = panSavedY.value + e.translationY
+    })
 
+  const pinchGesture = Gesture.Pinch()
+    .onStart(() => { savedScale.value = scaleVal.value })
+    .onUpdate(e => {
+      scaleVal.value = Math.min(8, Math.max(0.3, savedScale.value * e.scale))
+    })
+
+  const rotationGesture = Gesture.Rotation()
+    .onStart(() => { savedRot.value = rotationVal.value })
+    .onUpdate(e => { rotationVal.value = savedRot.value + e.rotation })
+
+  const composed = Gesture.Simultaneous(panGesture, Gesture.Simultaneous(pinchGesture, rotationGesture))
+
+  const mapAnimStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { scale: scaleVal.value },
+      { rotate: `${rotationVal.value}rad` },
+    ],
+  }))
+
+  // ── Zoom helpers ──────────────────────────────────────────────────────────
   const zoomIn  = () => {
-    const oldScale = baseScaleRef.current
-    const n = Math.min(oldScale + 0.5, 4)
-    baseScaleRef.current = n
-    setScale(n)
-    scrollToCenter(n, oldScale)
+    scaleVal.value = withTiming(Math.min(8, scaleVal.value + 0.5), { duration: 200 })
   }
   const zoomOut = () => {
-    const oldScale = baseScaleRef.current
-    const n = Math.max(oldScale - 0.5, 0.5)
-    baseScaleRef.current = n
-    setScale(n)
-    scrollToCenter(n, oldScale)
+    scaleVal.value = withTiming(Math.max(0.3, scaleVal.value - 0.5), { duration: 200 })
   }
 
   // Centraliza o mapa na posição GPS atual com zoom de navegação
   const centrarNoGps = useCallback(() => {
     if (!gps || !mapa) return
     const frac = gpsToFrac(gps.latitude, gps.longitude, mapa.sw_lat, mapa.sw_lng, mapa.ne_lat, mapa.ne_lng)
-    const targetScale = Math.max(baseScaleRef.current, 2.5)
-    const pixelX = frac.x * imgSize.w * targetScale
-    const pixelY = frac.y * imgSize.h * targetScale
-    const newScrollX = Math.max(0, pixelX - SCREEN_W / 2)
-    const newScrollY = Math.max(0, pixelY - SCREEN_H / 2)
-    baseScaleRef.current = targetScale
-    setScale(targetScale)
-    setTimeout(() => {
-      hScrollRef.current?.scrollTo({ x: newScrollX, animated: true })
-      vScrollRef.current?.scrollTo({ y: newScrollY, animated: true })
-    }, 50)
+    const iW = imgSize.w
+    const iH = imgSize.h
+    const targetScale = Math.max(scaleVal.value, 2.5)
+    const fx = frac.x * iW
+    const fy = frac.y * iH
+    scaleVal.value = withSpring(targetScale, { damping: 18, stiffness: 150 })
+    translateX.value = withSpring(SCREEN_W / 2 - iW / 2 - (fx - iW / 2) * targetScale, { damping: 18, stiffness: 150 })
+    translateY.value = withSpring(SCREEN_H / 2 - iH / 2 - (fy - iH / 2) * targetScale, { damping: 18, stiffness: 150 })
   }, [gps, mapa, imgSize])
-
-  const pinchGesture = Gesture.Pinch()
-    .runOnJS(true)
-    .onBegin(() => { baseScaleRef.current = scale })
-    .onUpdate(e => {
-      const next = Math.min(4, Math.max(0.5, baseScaleRef.current * e.scale))
-      setScale(next)
-    })
-    .onEnd(e => {
-      const oldScale = baseScaleRef.current
-      const newScale = Math.min(4, Math.max(0.5, oldScale * e.scale))
-      baseScaleRef.current = newScale
-      scrollToCenter(newScale, oldScale, e.focalX, e.focalY)
-    })
 
   // ── Loading ───────────────────────────────────────────────────────────────
   if (loading || !mapa) return (
@@ -490,25 +487,19 @@ export default function MapaViewerScreen() {
     </View>
   )
 
-  // ── Dimensões da imagem com zoom aplicado ─────────────────────────────────
-  const mapW = imgSize.w * scale
-  const mapH = imgSize.h * scale
-
-  // ── Posição do dot GPS na imagem ──────────────────────────────────────────
+  // ── Posição do dot GPS (coordenadas naturais — escala aplicada pelo Animated.View) ──
   let dotX = null, dotY = null
   if (gps) {
     const frac = gpsToFrac(gps.latitude, gps.longitude,
                            mapa.sw_lat, mapa.sw_lng, mapa.ne_lat, mapa.ne_lng)
-    dotX = frac.x * mapW
-    dotY = frac.y * mapH
+    dotX = frac.x * imgSize.w
+    dotY = frac.y * imgSize.h
   }
 
-  // ── Raio de precisão em pixels ────────────────────────────────────────────
-  // metros por grau latitude ≈ 111320m
-  // pixels por metro = mapW / ((ne_lng - sw_lng) * 111320 * cos(lat))
+  // Raio de precisão em pixels naturais (escala aplicada pelo transform)
   let accuracyRadius = 0
   if (gps && gps.accuracy) {
-    const metersPerPx = ((mapa.ne_lng - mapa.sw_lng) * 111320) / mapW
+    const metersPerPx = ((mapa.ne_lng - mapa.sw_lng) * 111320) / imgSize.w
     accuracyRadius = gps.accuracy / metersPerPx
   }
 
@@ -522,30 +513,14 @@ export default function MapaViewerScreen() {
         </View>
       )}
 
-      {/* Mapa com GPS overlay */}
-      <GestureDetector gesture={pinchGesture}>
-      <ScrollView
-        ref={vScrollRef}
-        style={st.scroll}
-        contentContainerStyle={{ minHeight: mapH }}
-        horizontal={false}
-        showsVerticalScrollIndicator={false}
-        onScroll={e => { scrollYRef.current = e.nativeEvent.contentOffset.y }}
-        scrollEventThrottle={16}>
-        <ScrollView
-          ref={hScrollRef}
-          horizontal
-          nestedScrollEnabled
-          style={{ width: SCREEN_W }}
-          contentContainerStyle={{ width: mapW, minHeight: mapH }}
-          showsHorizontalScrollIndicator={false}
-          onScroll={e => { scrollXRef.current = e.nativeEvent.contentOffset.x }}
-          scrollEventThrottle={16}>
-          <View style={{ width: mapW, height: mapH }}>
+      {/* Mapa com GPS overlay — gestures fluidos (Pan + Pinch + Rotation) */}
+      <View style={st.scroll} collapsable={false}>
+      <GestureDetector gesture={composed}>
+        <Animated.View style={[{ width: imgSize.w, height: imgSize.h, position: 'absolute' }, mapAnimStyle]}>
             {/* Imagem do mapa (local cache ou URL) */}
             <Image
               source={{ uri: localUri ?? mapa.imagem_url }}
-              style={{ width: mapW, height: mapH }}
+              style={{ width: imgSize.w, height: imgSize.h }}
               resizeMode="stretch"
             />
 
@@ -556,8 +531,8 @@ export default function MapaViewerScreen() {
               const pt2 = trajeto[0]
               const f1  = gpsToFrac(pt1.lat, pt1.lng, mapa.sw_lat, mapa.sw_lng, mapa.ne_lat, mapa.ne_lng)
               const f2  = gpsToFrac(pt2.lat, pt2.lng, mapa.sw_lat, mapa.sw_lng, mapa.ne_lat, mapa.ne_lng)
-              const x1 = f1.x * mapW, y1 = f1.y * mapH
-              const x2 = f2.x * mapW, y2 = f2.y * mapH
+              const x1 = f1.x * imgSize.w, y1 = f1.y * imgSize.h
+              const x2 = f2.x * imgSize.w, y2 = f2.y * imgSize.h
               const dx = x2 - x1, dy = y2 - y1
               const len = Math.sqrt(dx * dx + dy * dy)
               if (len < 1) return null
@@ -584,8 +559,8 @@ export default function MapaViewerScreen() {
               const pt2 = trajeto[i + 1]
               const f1  = gpsToFrac(pt.lat,  pt.lng,  mapa.sw_lat, mapa.sw_lng, mapa.ne_lat, mapa.ne_lng)
               const f2  = gpsToFrac(pt2.lat, pt2.lng, mapa.sw_lat, mapa.sw_lng, mapa.ne_lat, mapa.ne_lng)
-              const x1 = f1.x * mapW, y1 = f1.y * mapH
-              const x2 = f2.x * mapW, y2 = f2.y * mapH
+              const x1 = f1.x * imgSize.w, y1 = f1.y * imgSize.h
+              const x2 = f2.x * imgSize.w, y2 = f2.y * imgSize.h
               const dx = x2 - x1, dy = y2 - y1
               const len = Math.sqrt(dx * dx + dy * dy)
               if (len < 1) return null
@@ -633,7 +608,7 @@ export default function MapaViewerScreen() {
             {coordPin && (() => {
               const f = gpsToFrac(coordPin.lat, coordPin.lng, mapa.sw_lat, mapa.sw_lng, mapa.ne_lat, mapa.ne_lng)
               return (
-                <View pointerEvents="none" style={[st.coordPin, { left: f.x * mapW - 14, top: f.y * mapH - 32 }]}>
+                <View pointerEvents="none" style={[st.coordPin, { left: f.x * imgSize.w - 14, top: f.y * imgSize.h - 32 }]}>
                   <Ionicons name="location" size={28} color="#f59e0b" />
                   {!!coordPin.label && <Text style={st.coordPinLabel}>{coordPin.label}</Text>}
                 </View>
@@ -646,7 +621,7 @@ export default function MapaViewerScreen() {
               return (
                 <TouchableOpacity
                   key={p.id}
-                  style={[st.pontoBtn, { left: f.x * mapW - 14, top: f.y * mapH - 14 }]}
+                  style={[st.pontoBtn, { left: f.x * imgSize.w - 14, top: f.y * imgSize.h - 14 }]}
                   onPress={() => Alert.alert('Foto plotada', `${p.lat.toFixed(6)}°, ${p.lng.toFixed(6)}°`)}>
                   <Ionicons name="camera" size={16} color="#fff" />
                 </TouchableOpacity>
@@ -658,7 +633,7 @@ export default function MapaViewerScreen() {
               const pt2 = trajetoVer.pontos[i + 1]
               const f1 = gpsToFrac(pt.lat, pt.lng, mapa.sw_lat, mapa.sw_lng, mapa.ne_lat, mapa.ne_lng)
               const f2 = gpsToFrac(pt2.lat, pt2.lng, mapa.sw_lat, mapa.sw_lng, mapa.ne_lat, mapa.ne_lng)
-              const x1 = f1.x * mapW, y1 = f1.y * mapH, x2 = f2.x * mapW, y2 = f2.y * mapH
+              const x1 = f1.x * imgSize.w, y1 = f1.y * imgSize.h, x2 = f2.x * imgSize.w, y2 = f2.y * imgSize.h
               const dx = x2 - x1, dy = y2 - y1
               const len = Math.sqrt(dx * dx + dy * dy)
               if (len < 1) return null
@@ -673,10 +648,9 @@ export default function MapaViewerScreen() {
                 }} />
               )
             })}
-          </View>
-        </ScrollView>
-      </ScrollView>
+        </Animated.View>
       </GestureDetector>
+      </View>
 
       {/* ── Rosa dos ventos ─────────────────────────────────────────────────── */}
       {tracking && (
@@ -1011,7 +985,7 @@ const DOT = 20
 const st = StyleSheet.create({
   root:        { flex: 1, backgroundColor: '#111' },
   center:      { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#111' },
-  scroll:      { flex: 1 },
+  scroll:      { flex: 1, overflow: 'hidden' },
 
   // GPS dot
   dotWrap:     { position: 'absolute', width: DOT + 8, height: DOT + 8, justifyContent: 'center', alignItems: 'center' },
