@@ -357,8 +357,8 @@ export default function RootLayout() {
   // ── FASE ready: app normal ────────────────────────────────────────────────
   return (
     <SafeAreaProvider>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <Stack screenOptions={{ headerShown: false }}>
+      <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#0B1A3B' }}>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0B1A3B' } }}>
           <Stack.Screen name="(auth)"      options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)"      options={{ headerShown: false }} />
           <Stack.Screen name="apontamento" options={{ headerShown: false }} />
