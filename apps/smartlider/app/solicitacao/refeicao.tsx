@@ -200,40 +200,26 @@ export default function SolicitarRefeicaoScreen() {
   }, [])
 
   // ── Carrega colaboradores quando equipe muda ──────────────────────────────
-  // Fonte primária: lider_colaboradores (equipe do turno) — mesma fonte de
-  // EPI e mão de obra, garantindo equipe única no app.
-  // Fallback: refei_colaboradores caso lider_colaboradores esteja vazio.
+  // MESMA fonte que mao-de-obra.tsx e epi.tsx: lider_colaboradores pelo
+  // equipe_id do turno ativo. Garante lista única em todo o app.
   useEffect(() => {
-    const liderEquipeId = liderPerfil?.equipe_id ?? turnoAtivo?.equipe_id
-    if (!refeiEquipeId && !liderEquipeId) { setColab([]); setMarcacoes({}); return }
+    const equipeId = turnoAtivo?.equipe_id
+    if (!equipeId) { setColab([]); setMarcacoes({}); return }
 
-    async function loadColabs() {
-      let lista: any[] = []
-      // 1) Fonte principal: lider_colaboradores (igual EPI / mão de obra)
-      if (liderEquipeId) {
-        const { data } = await supabase.from('lider_colaboradores')
-          .select('id, nome, cargo')
-          .eq('equipe_id', liderEquipeId)
-          .eq('ativo', true)
-          .order('nome')
-        lista = data || []
-      }
-      // 2) Fallback: refei_colaboradores (quando equipe do turno não tem cadastro)
-      if (lista.length === 0 && refeiEquipeId) {
-        const { data } = await supabase.from('refei_colaboradores')
-          .select('id, nome, cargo, efetivo_id')
-          .eq('equipe_id', refeiEquipeId)
-          .eq('ativo', true)
-          .order('nome')
-        lista = data || []
-      }
-      setColab(lista)
-      const defaults = {}
-      lista.forEach(c => { defaults[c.id] = { refeicao: true, cafe: false } })
-      setMarcacoes(defaults)
-    }
-    loadColabs()
-  }, [refeiEquipeId, liderPerfil?.equipe_id])
+    supabase.from('lider_colaboradores')
+      .select('id, nome, cargo')
+      .eq('equipe_id', equipeId)
+      .eq('ativo', true)
+      .order('nome')
+      .then(({ data }) => {
+        const lista = data || []
+        setColab(lista)
+        const defaults = {}
+        lista.forEach(c => { defaults[c.id] = { refeicao: true, cafe: false } })
+        setMarcacoes(defaults)
+      })
+      .catch(() => {})
+  }, [turnoAtivo?.equipe_id])
 
   // ── Toggles ──────────────────────────────────────────────────────────────
   function toggleItem(id, campo) {
