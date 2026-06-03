@@ -72,7 +72,12 @@ export default function MaoDeObraScreen() {
       .select('id, colaborador_id, colaborador_nome, cargo, presente, horas_trabalhadas, observacao')
       .eq('turno_id', turnoAtivo.id)
       .order('colaborador_nome')
-    setRecords(data ?? [])
+    // Mescla com pendentes da fila (visíveis mesmo offline)
+    const queueItems = useSyncStore.getState().queue
+      .filter(r => r.table === 'lider_mao_obra' && r.payload.turno_id === turnoAtivo.id)
+    const pendentes = queueItems.map(r => ({ ...r.payload, sync_status: 'pending' }))
+    const syncedIds = new Set((data ?? []).map(r => r.id))
+    setRecords([...(data ?? []), ...pendentes.filter(r => !syncedIds.has(r.id))])
     setLoading(false)
   }, [turnoAtivo?.id])
 
