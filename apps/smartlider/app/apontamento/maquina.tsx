@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../src/lib/supabase'
 import useLiderStore from '../../src/store/useLiderStore'
 import useSyncStore from '../../src/store/useSyncStore'
+import { isClearlyOffline } from '../../src/lib/network'
 import useLookupCache from '../../src/store/useLookupCache'
 import { C, fmtDate } from '../../src/lib/theme'
 import { StatCard, StatusChip, SyncBanner, Section, EmptyList } from '../../src/components/ModuleShared'
@@ -84,6 +85,7 @@ export default function MaquinaScreen() {
       atividade, status, observacao: obs, criado_por: user.user?.id,
     }
     try {
+      if (await isClearlyOffline()) throw new Error('offline')
       const { error } = await supabase.from('lider_apontamentos_maquina').upsert(payload, { onConflict: 'turno_id,maquina_id' })
       if (error) throw error
       await carregar()

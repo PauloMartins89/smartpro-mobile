@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { supabase } from '../../src/lib/supabase'
 import useLiderStore from '../../src/store/useLiderStore'
+import { isClearlyOffline } from '../../src/lib/network'
 import { C } from '../../src/lib/theme'
 
 function fmtDateLong(iso: string) {
@@ -42,6 +43,8 @@ export default function DashboardScreen() {
   const turnoAtivo        = useLiderStore(s => s.turnoAtivo)
   const workspaceId       = useLiderStore(s => s.workspaceId)
   const dashRefreshKey    = useLiderStore(s => s.dashRefreshKey)
+  const turnoStats        = useLiderStore(s => s.turnoStats)
+  const setTurnoStats     = useLiderStore(s => s.setTurnoStats)
   const [dados,   setDados]   = useState<DashData | null>(null)
   const [loading, setLoading] = useState(true)
   const [refresh, setRefresh] = useState(false)
@@ -49,6 +52,22 @@ export default function DashboardScreen() {
   const carregar = useCallback(async (isRefresh = false) => {
     if (!turnoAtivo) return
     isRefresh ? setRefresh(true) : setLoading(true)
+
+    // Se offline, usa cache do turnoStats
+    if (!isRefresh && await isClearlyOffline()) {
+      if (turnoStats) {
+        setDados({
+          presentes:             turnoStats.presentes            ?? 0,
+          total_colaboradores:   turnoStats.total_colaboradores  ?? 0,
+          maquinas_ativas:       turnoStats.maquinas             ?? 0,
+          ha_realizado:          turnoStats.ha_realizado         ?? 0,
+          ha_meta:               turnoStats.ha_meta              ?? 0,
+          refeicoes_solicitadas: turnoStats.refeicoes            ?? 0,
+        })
+      }
+      setLoading(false)
+      return
+    }
 
     try {
       const [
@@ -68,13 +87,30 @@ export default function DashboardScreen() {
       const ha_realizado = prodData?.reduce((s, r) => s + (r.realizado_ha ?? 0), 0) ?? 0
       const ha_meta      = prodData?.reduce((s, r) => s + (r.meta_ha      ?? 0), 0) ?? 0
 
-      setDados({
+      const novosDados = {
         presentes:             presentes ?? 0,
         total_colaboradores:   total     ?? 0,
         maquinas_ativas:       maquinas  ?? 0,
         ha_realizado,
         ha_meta,
         refeicoes_solicitadas: refeicoes ?? 0,
+      }
+      setDados(novosDados)
+      // Persiste no store para uso offline futuro
+      setTurnoStats({
+        presentes:           novosDados.presentes,
+        total_colaboradores: novosDados.total_colaboradores,
+        maquinas:            novosDados.maquinas_ativas,
+        ha_realizado:        novosDados.ha_realizado,
+        ha_meta:             novosDados.ha_meta,
+        refeicoes:           novosDados.refeicoes_solicitadas,
+        epis_pendentes:      0,
+        solicitacoes:        0,
+        afericoes_reprovadas: 0,
+        epis_vencendo:        0,
+        avaliacao_media:      0,
+        insumos_divergentes:  0,
+        updatedAt:            new Date().toISOString(),
       })
     } catch {
       setDados({ presentes: 0, total_colaboradores: 0, maquinas_ativas: 0, ha_realizado: 0, ha_meta: 0, refeicoes_solicitadas: 0 })

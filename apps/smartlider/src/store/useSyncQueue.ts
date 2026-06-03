@@ -5,32 +5,17 @@
  * Estratégia:
  * - Quando o app volta ao foreground (AppState: background → active), tenta
  *   sincronizar registros pendentes da fila (useSyncStore).
+ * - Quando a rede é restabelecida enquanto o app está em foreground
+ *   (Network.addNetworkStateListener), também dispara a fila.
  * - Faz um ping leve na URL do Supabase antes de tentar (evita tentativas
  *   desnecessárias sem rede).
  * - Deve ser montado UMA VEZ no layout raiz das tabs.
  */
 import { useEffect, useRef } from 'react'
 import { AppState, type AppStateStatus } from 'react-native'
+import * as Network from 'expo-network'
 import useSyncStore from './useSyncStore'
-
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? ''
-
-/** Testa conectividade com o servidor: true = online */
-async function isOnline(): Promise<boolean> {
-  if (!SUPABASE_URL) return true   // fallback: tenta mesmo assim
-  try {
-    const ctrl = new AbortController()
-    const tid  = setTimeout(() => ctrl.abort(), 5_000)
-    const res  = await fetch(`${SUPABASE_URL}/rest/v1/`, {
-      method: 'HEAD',
-      signal: ctrl.signal,
-    })
-    clearTimeout(tid)
-    return res.ok || res.status < 500
-  } catch {
-    return false
-  }
-}
+import { isOnline } from '../lib/network'
 
 export default function useSyncQueue() {
   const sync  = useSyncStore(s => s.sync)
@@ -50,24 +35,37 @@ export default function useSyncQueue() {
       })
     }
 
-    const sub = AppState.addEventListener('change', async (nextState: AppStateStatus) => {
+    // Listener de AppState: sincroniza quando app volta ao foreground
+    const appSub = AppState.addEventListener('change', async (nextState: AppStateStatus) => {
       const wasBackground = prevStateRef.current === 'background' || prevStateRef.current === 'inactive'
       const isActive      = nextState === 'active'
 
       if (wasBackground && isActive) {
-        // App voltou ao primeiro plano — verifica fila
         const { queue: currentQueue } = useSyncStore.getState()
         if (currentQueue.length > 0) {
           const online = await isOnline()
-          if (online) {
-            await sync()
-          }
+          if (online) await sync()
         }
       }
 
       prevStateRef.current = nextState
     })
 
-    return () => sub.remove()
+    // Listener de rede: sincroniza quando conexão é restabelecida em foreground
+    const netSub = Network.addNetworkStateListener(async ({ isConnected, isInternetReachable }) => {
+      if (isConnected && isInternetReachable !== false) {
+        const { queue: currentQueue } = useSyncStore.getState()
+        if (currentQueue.length > 0) {
+          console.log(`[sync-queue] rede voltou | queue=${currentQueue.length}`)
+          const online = await isOnline()
+          if (online) sync()
+        }
+      }
+    })
+
+    return () => {
+      appSub.remove()
+      netSub.remove()
+    }
   }, [])  // sem deps: registra uma vez por ciclo de vida do layout
 }

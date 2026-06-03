@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../src/lib/supabase'
 import useLiderStore from '../../src/store/useLiderStore'
 import useSyncStore from '../../src/store/useSyncStore'
+import { isClearlyOffline } from '../../src/lib/network'
 import { C, fmtDate } from '../../src/lib/theme'
 import { StatCard, StatusChip, SyncBanner, Section, EmptyList } from '../../src/components/ModuleShared'
 
@@ -85,6 +86,7 @@ export default function AvaliacaoEquipeScreen() {
       ...notas, nota_geral, comentario: obs,
     }
     try {
+      if (await isClearlyOffline()) throw new Error('offline')
       const { error } = await supabase.from('lider_avaliacoes_equipe').upsert(payload, { onConflict: 'turno_id,equipe_id' })
       if (error) throw error
       await carregar()
