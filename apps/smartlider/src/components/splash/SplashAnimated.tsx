@@ -302,7 +302,7 @@ export default function SplashAnimated({ onFinish }: { onFinish: () => void }) {
 
     setTimeout(() => {
       screenOp.value = withTiming(0, { duration: 280 }, () => runOnJS(onFinish)())
-    }, 2500)
+    }, 3000)
   }, [])
 
   const headerStyle = useAnimatedStyle(() => ({ opacity: headerOp.value, transform: [{ translateY: headerY.value }] }))
