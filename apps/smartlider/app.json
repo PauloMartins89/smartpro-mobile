@@ -33,15 +33,6 @@
       "expo-router",
       "expo-font",
       [
-        "expo-splash-screen",
-        {
-          "backgroundColor": "#0B1A3B",
-          "dark": {
-            "backgroundColor": "#0B1A3B"
-          }
-        }
-      ],
-      [
         "expo-image-picker",
         {
           "photosPermission": "Permite selecionar imagens para importar mapas de campo."
@@ -64,8 +55,8 @@
         {
           "android": {
             "minSdkVersion": 24,
-            "targetSdkVersion": 35,
-            "compileSdkVersion": 35,
+            "targetSdkVersion": 36,
+            "compileSdkVersion": 36,
             "enableMinifyInReleaseBuilds": true,
             "enableShrinkResourcesInReleaseBuilds": true
           }
