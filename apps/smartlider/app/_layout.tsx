@@ -188,13 +188,37 @@ const eb = StyleSheet.create({
 const GLOBAL_WS = '00000000-0000-0000-0000-000000000001'
 
 async function fetchAndSetLiderPerfil(userId: string, setLiderPerfil: (p: LiderPerfil | null) => void) {
-  // 1. Busca perfil do líder (sem join — evita 406 por schema cache desatualizado)
-  const { data: p } = await supabase
+  // 1. Busca perfil do líder pelo user_id
+  let { data: p } = await supabase
     .from('lider_perfis')
     .select('id, matricula, nome, workspace_id, equipe_id')
     .eq('user_id', userId)
     .eq('ativo', true)
     .maybeSingle()
+
+  // 2. Se não encontrou pelo user_id, tenta pela matrícula (email-derivada)
+  //    Isso acontece quando signUp() criou um usuário duplicado com UUID diferente
+  if (!p) {
+    const { data: { user } } = await supabase.auth.getUser()
+    const email = user?.email ?? ''
+    if (email.endsWith('@lider.smartpro')) {
+      const matricula = email.replace('@lider.smartpro', '')
+      const { data: pByMatricula } = await supabase
+        .from('lider_perfis')
+        .select('id, matricula, nome, workspace_id, equipe_id')
+        .eq('matricula', matricula)
+        .eq('ativo', true)
+        .maybeSingle()
+      if (pByMatricula) {
+        // Re-vincula o perfil ao user_id atual (corrige UUID duplicado)
+        await supabase
+          .from('lider_perfis')
+          .update({ user_id: userId })
+          .eq('id', pByMatricula.id)
+        p = pByMatricula
+      }
+    }
+  }
 
   if (!p) return
 
