@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../src/lib/supabase'
 import useLiderStore from '../../src/store/useLiderStore'
 import useSyncStore from '../../src/store/useSyncStore'
+import { isClearlyOffline } from '../../src/lib/network'
 import { C, fmtDate } from '../../src/lib/theme'
 import { StatCard, StatusChip, SyncBanner, Section, EmptyList } from '../../src/components/ModuleShared'
 
@@ -71,6 +72,7 @@ export default function ProdutividadeEquipeScreen() {
       observacao: obs, criado_por: user.user?.id,
     }
     try {
+      if (await isClearlyOffline()) throw new Error('offline')
       const { error } = await supabase.from('lider_produtividade_equipe').insert(payload)
       if (error) throw error
       await carregar()

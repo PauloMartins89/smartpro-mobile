@@ -12,6 +12,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../../src/lib/supabase'
 import useLiderStore from '../../src/store/useLiderStore'
 import useSyncStore from '../../src/store/useSyncStore'
+import { isClearlyOffline } from '../../src/lib/network'
 import useLookupCache from '../../src/store/useLookupCache'
 import { C } from '../../src/lib/theme'
 import { StatCard, SyncBanner, EmptyList } from '../../src/components/ModuleShared'
@@ -139,6 +140,7 @@ export default function MaoDeObraScreen() {
       }
     })
     try {
+      if (await isClearlyOffline()) throw new Error('offline')
       const { error } = await supabase.from('lider_mao_obra').insert(payloads)
       if (error) throw error
       await carregar()
@@ -178,6 +180,7 @@ export default function MaoDeObraScreen() {
       observacao: observacao || null,
     }
     try {
+      if (await isClearlyOffline()) throw new Error('offline')
       const { error } = await supabase.from('lider_mao_obra').insert(payload)
       if (error) throw error
       await carregar()
