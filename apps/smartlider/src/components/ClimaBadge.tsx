@@ -75,15 +75,36 @@ export default function ClimaBadge() {
   })
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // ── Busca clima na API Open-Meteo via GPS ────────────────────────────
-  const buscarClima = useCallback(async () => {
+  // ── Busca coords: tenta GPS, fallback para IP ────────────────────────
+  async function obterCoordenadas(): Promise<{ latitude: number; longitude: number } | null> {
+    // 1. Tenta GPS nativo
     try {
       const { status } = await Location.requestForegroundPermissionsAsync()
-      if (status !== 'granted') { setLocError(true); setLoading(false); return }
+      if (status === 'granted') {
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
+        return { latitude: loc.coords.latitude, longitude: loc.coords.longitude }
+      }
+    } catch { /* GPS indisponível */ }
 
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
-      const { latitude, longitude } = loc.coords
+    // 2. Fallback: geolocalização por IP (funciona no browser e quando GPS negado)
+    try {
+      const res  = await fetch('https://ipapi.co/json/')
+      const json = await res.json()
+      if (json.latitude && json.longitude) {
+        return { latitude: json.latitude, longitude: json.longitude }
+      }
+    } catch { /* IP geolocation falhou */ }
 
+    return null
+  }
+
+  // ── Busca clima na API Open-Meteo ─────────────────────────────────────
+  const buscarClima = useCallback(async () => {
+    try {
+      const coords = await obterCoordenadas()
+      if (!coords) { setLocError(true); setLoading(false); return }
+
+      const { latitude, longitude } = coords
       const url =
         `https://api.open-meteo.com/v1/forecast` +
         `?latitude=${latitude.toFixed(4)}&longitude=${longitude.toFixed(4)}` +
