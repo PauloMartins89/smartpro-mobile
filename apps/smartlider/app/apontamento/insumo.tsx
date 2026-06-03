@@ -56,7 +56,7 @@ export default function InsumoApontamentoScreen() {
       .select('id, quantidade, unidade, status, created_at, lider_produtos(nome)')
       .eq('turno_id', turnoAtivo.id)
       .order('created_at', { ascending: false })
-    setRecords((data ?? []).map(r => ({
+    const syncedRecords = (data ?? []).map(r => ({
       id: r.id,
       produto_nome: r.lider_produtos?.nome ?? '�',
       quantidade: r.quantidade,
@@ -64,7 +64,18 @@ export default function InsumoApontamentoScreen() {
       status: r.status ?? 'enviado',
       created_at: r.created_at,
       sync_status: 'synced',
-    })))
+    }))
+    // Mescla com pendentes da fila (visíveis mesmo offline)
+    const queueItems = useSyncStore.getState().queue
+      .filter(r => r.table === 'lider_apontamentos_insumo' && r.payload.turno_id === turnoAtivo.id)
+    const wid = useLiderStore.getState().workspaceId
+    const allProdutos = useLookupCache.getState().data[`produtos:${wid}`] ?? []
+    const pendentes = queueItems.map(r => {
+      const p = allProdutos.find(x => x.id === r.payload.produto_id)
+      return { ...r.payload, produto_nome: p?.nome ?? '?', sync_status: 'pending' }
+    })
+    const syncedIds = new Set(syncedRecords.map(r => r.id))
+    setRecords([...syncedRecords, ...pendentes.filter(r => !syncedIds.has(r.id))])
     setLoading(false)
   }, [turnoAtivo?.id])
 

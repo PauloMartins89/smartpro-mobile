@@ -8,6 +8,8 @@ import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../src/lib/supabase'
 import useLiderStore from '../src/store/useLiderStore'
+import useSyncStore from '../src/store/useSyncStore'
+import { isClearlyOffline } from '../src/lib/network'
 import { C, fmtDate, TURNO_LABEL } from '../src/lib/theme'
 
 interface Resumo {
@@ -26,6 +28,7 @@ export default function FechamentoScreen() {
   const insets      = useSafeAreaInsets()
   const turnoAtivo  = useLiderStore(s => s.turnoAtivo)
   const setTurno    = useLiderStore(s => s.setTurnoAtivo)
+  const turnoStats  = useLiderStore(s => s.turnoStats)
   const [resumo,   setResumo]  = useState<Resumo | null>(null)
   const [loading,  setLoading] = useState(true)
   const [fechando, setFechando]= useState(false)
@@ -50,6 +53,21 @@ export default function FechamentoScreen() {
         ha_meta:      (prod ?? []).reduce((s, r) => s + (r.area_meta      ?? 0), 0),
       })
       setLoading(false)
+    }).catch(() => {
+      // Offline: usa snapshot do store
+      if (turnoStats) {
+        setResumo({
+          presentes:    turnoStats.presentes,
+          ausentes:     turnoStats.total_colaboradores - turnoStats.presentes,
+          maquinas:     turnoStats.maquinas,
+          insumos:      useSyncStore.getState().queue.filter(r => r.table === 'lider_apontamentos_insumo' && r.payload.turno_id === turnoAtivo.id).length,
+          refeicoes:    turnoStats.refeicoes,
+          avaliacao:    turnoStats.avaliacao_media || null,
+          ha_realizado: turnoStats.ha_realizado,
+          ha_meta:      turnoStats.ha_meta,
+        })
+      }
+      setLoading(false)
     })
   }, [turnoAtivo?.id])
 
@@ -62,6 +80,20 @@ export default function FechamentoScreen() {
         { text: 'Cancelar', style: 'cancel' },
         { text: 'Fechar Turno', style: 'destructive', onPress: async () => {
           setFechando(true)
+
+          // Offline: enfileira o fechamento
+          if (await isClearlyOffline()) {
+            useSyncStore.getState().addToQueue({
+              id: turnoAtivo.id, table: 'lider_turnos', action: 'update',
+              payload: { id: turnoAtivo.id, status: 'fechado', fechado_em: new Date().toISOString() },
+              created_at: new Date().toISOString(),
+            })
+            setTurno(null)
+            Alert.alert('Turno Fechado!', 'Será sincronizado quando a conexão voltar.')
+            router.replace('/turno/novo')
+            return
+          }
+
           const { error } = await supabase.from('lider_turnos')
             .update({ status: 'fechado', fechado_em: new Date().toISOString() })
             .eq('id', turnoAtivo.id)

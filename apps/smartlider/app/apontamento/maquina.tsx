@@ -51,7 +51,17 @@ export default function MaquinaScreen() {
       .select('id, horimetro_inicio, horimetro_fim, atividade, status, created_at, lider_maquinas(nome, codigo)')
       .eq('turno_id', turnoAtivo.id)
       .order('created_at', { ascending: false })
-    setRecords(data ?? [])
+    // Mescla com pendentes da fila (visíveis mesmo offline)
+    const queueItems = useSyncStore.getState().queue
+      .filter(r => r.table === 'lider_apontamentos_maquina' && r.payload.turno_id === turnoAtivo.id)
+    const wid = useLiderStore.getState().workspaceId
+    const allMaquinas = useLookupCache.getState().data[`maquinas:${wid}`] ?? []
+    const pendentes = queueItems.map(r => {
+      const m = allMaquinas.find(x => x.id === r.payload.maquina_id)
+      return { ...r.payload, lider_maquinas: m ?? { nome: '?', codigo: '?' }, sync_status: 'pending' }
+    })
+    const syncedIds = new Set((data ?? []).map(r => r.id))
+    setRecords([...(data ?? []), ...pendentes.filter(r => !syncedIds.has(r.id))])
     setLoading(false)
   }, [turnoAtivo?.id])
 

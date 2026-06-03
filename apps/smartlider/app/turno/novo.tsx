@@ -8,6 +8,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../src/lib/supabase'
 import useLiderStore, { type Turno } from '../../src/store/useLiderStore'
+import useSyncStore from '../../src/store/useSyncStore'
+import { isClearlyOffline } from '../../src/lib/network'
 import { C, TURNO_LABEL, todayISO, fmtDate } from '../../src/lib/theme'
 
 /** Sugestao de turno pelo horario atual */
@@ -16,6 +18,13 @@ function turnoByHora(): Turno {
   if (h >= 6  && h < 14) return 'manha'
   if (h >= 14 && h < 22) return 'tarde'
   return 'noite'
+}
+
+function uuidv4() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16)
+  })
 }
 
 const TURNOS: { id: Turno; label: string; icon: string; color: string }[] = [
@@ -82,8 +91,43 @@ export default function IniciarTurnoScreen() {
   async function handleIniciar() {
     setLoading(true)
     try {
-      const { data: authUser } = await supabase.auth.getUser()
-      const uid = authUser.user?.id
+      // ─── Offline: cria turno local e enfileira para sync ───────
+      if (await isClearlyOffline()) {
+        // Reutiliza turno ativo se já corresponde ao selecionado
+        const { turnoAtivo: atual } = useLiderStore.getState()
+        if (atual && atual.equipe_id === liderPerfil.equipe_id && atual.data === data && atual.turno === turno) {
+          router.replace('/(tabs)')
+          return
+        }
+        const turnoId = uuidv4()
+        const payload = {
+          id: turnoId,
+          workspace_id: liderPerfil.workspace_id,
+          frente_id:    liderPerfil.frente_id,
+          equipe_id:    liderPerfil.equipe_id,
+          lider_nome:   liderPerfil.nome,
+          data, turno, status: 'aberto',
+        }
+        useSyncStore.getState().addToQueue({ id: turnoId, table: 'lider_turnos', action: 'insert', payload, created_at: new Date().toISOString() })
+        setTurnoAtivo({
+          id:          turnoId,
+          frente_id:   liderPerfil.frente_id   ?? '',
+          frente_nome: liderPerfil.frente_codigo && liderPerfil.frente_nome
+            ? `${liderPerfil.frente_codigo} · ${liderPerfil.frente_nome}`
+            : (liderPerfil.frente_nome ?? ''),
+          equipe_id:   liderPerfil.equipe_id!,
+          equipe_nome: liderPerfil.equipe_codigo ?? liderPerfil.equipe_nome ?? '',
+          lider_nome:  liderPerfil.nome,
+          data, turno, status: 'aberto',
+        })
+        Alert.alert('Turno criado offline', 'Será sincronizado quando a conexão voltar.')
+        router.replace('/(tabs)')
+        return
+      }
+
+      // ─── Online: fluxo normal ───────────────────────────────────
+      const { data: { session } } = await supabase.auth.getSession()
+      const uid = session?.user?.id
 
       const { data: existing } = await supabase
         .from('lider_turnos')
