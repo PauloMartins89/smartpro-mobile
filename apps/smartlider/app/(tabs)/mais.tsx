@@ -3,17 +3,26 @@ import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { supabase } from '../../src/lib/supabase'
 import useLiderStore from '../../src/store/useLiderStore'
+import { useFeature } from '../../src/lib/useFeature'
 import { C } from '../../src/lib/theme'
 
-const ITEMS = [
-  { icon: 'map-outline',           label: 'Mapas de Campo',       route: '/mapa' },
-  { icon: 'document-text-outline', label: 'Fechar Dia / Boletim', route: '/fechamento' },
-  { icon: 'terminal-outline',      label: 'Diagnóstico / Logs',   route: '/diagnostico' },
+const ITEMS_FIXOS = [
+  { icon: 'map-outline',           label: 'Mapas de Campo',       route: '/mapa'        },
+  { icon: 'document-text-outline', label: 'Fechar Dia / Boletim', route: '/fechamento'  },
+  { icon: 'terminal-outline',      label: 'Diagnóstico / Logs',  route: '/diagnostico' },
 ]
 
 export default function MaisScreen() {
-  const router     = useRouter()
-  const setTurno   = useLiderStore(s => s.setTurnoAtivo)
+  const router          = useRouter()
+  const setTurno        = useLiderStore(s => s.setTurnoAtivo)
+  const showHistorico   = useFeature('historico_turnos')
+  const showOcorrencias = useFeature('ocorrencias')
+
+  const ITEMS = [
+    showHistorico   && { icon: 'calendar-outline', label: 'Histórico de Turnos', route: '/turno/historico'          },
+    showOcorrencias && { icon: 'warning-outline',  label: 'Ocorrências',         route: '/apontamento/ocorrencia'   },
+    ...ITEMS_FIXOS,
+  ].filter(Boolean)
 
   async function handleLogout() {
     Alert.alert('Sair', 'Tem certeza que deseja sair?', [

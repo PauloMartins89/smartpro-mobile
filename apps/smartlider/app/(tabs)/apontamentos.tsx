@@ -1,21 +1,28 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
+import { useFeature } from '../../src/lib/useFeature'
 import { C } from '../../src/lib/theme'
 
-const ITEMS = [
-  { icon: 'people-outline',            label: 'Mao de Obra',              sub: 'Presenca e horas trabalhadas',     route: '/apontamento/mao-de-obra' },
-  { icon: 'construct-outline',         label: 'Maquina',                  sub: 'Horimetros e atividade',           route: '/apontamento/maquina' },
-  { icon: 'flask-outline',             label: 'Insumo',                   sub: 'Produto, quantidade e area',       route: '/apontamento/insumo' },
-  { icon: 'speedometer-outline',       label: 'Afericao',                 sub: 'Vazao, velocidade e volume L/ha',  route: '/apontamento/afericao' },
-  { icon: 'shield-checkmark-outline',  label: 'Controle de EPI',          sub: 'Entrega, validade e situacao',     route: '/apontamento/controle-epi' },
-  { icon: 'star-outline',              label: 'Avaliacao da Equipe',      sub: 'Pontualidade, producao e mais',    route: '/apontamento/avaliacao-equipe' },
-  { icon: 'map-outline',               label: 'Produtividade Equipe',     sub: 'Atividade, meta e realizado ha',   route: '/apontamento/produtividade-equipe' },
-  { icon: 'analytics-outline',         label: 'Produtividade Equipamento',sub: 'ha realizado vs meta por maquina', route: '/apontamento/produtividade-equipamento' },
+const ITEMS_BASE = [
+  { icon: 'people-outline',            label: 'Mao de Obra',               sub: 'Presenca e horas trabalhadas',     route: '/apontamento/mao-de-obra' },
+  { icon: 'construct-outline',         label: 'Maquina',                   sub: 'Horimetros e atividade',           route: '/apontamento/maquina' },
+  { icon: 'flask-outline',             label: 'Insumo',                    sub: 'Produto, quantidade e area',       route: '/apontamento/insumo' },
+  { icon: 'speedometer-outline',       label: 'Afericao',                  sub: 'Vazao, velocidade e volume L/ha',  route: '/apontamento/afericao' },
+  { icon: 'shield-checkmark-outline',  label: 'Controle de EPI',           sub: 'Entrega, validade e situacao',     route: '/apontamento/controle-epi' },
+  { icon: 'star-outline',              label: 'Avaliacao da Equipe',       sub: 'Pontualidade, producao e mais',    route: '/apontamento/avaliacao-equipe' },
+  { icon: 'map-outline',               label: 'Produtividade Equipe',      sub: 'Atividade, meta e realizado ha',   route: '/apontamento/produtividade-equipe' },
+  { icon: 'analytics-outline',         label: 'Produtividade Equipamento', sub: 'ha realizado vs meta por maquina', route: '/apontamento/produtividade-equipamento' },
 ]
 
 export default function ApontamentosScreen() {
-  const router = useRouter()
+  const router          = useRouter()
+  const showOcorrencias = useFeature('ocorrencias')
+
+  const ITEMS = [
+    ...ITEMS_BASE,
+    showOcorrencias && { icon: 'warning-outline', label: 'Ocorrencias', sub: 'Quebras, acidentes e incidentes', route: '/apontamento/ocorrencia' },
+  ].filter(Boolean)
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
       <Text style={styles.title}>Apontamentos</Text>
