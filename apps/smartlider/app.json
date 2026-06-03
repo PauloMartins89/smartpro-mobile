@@ -16,7 +16,7 @@
     },
     "android": {
       "package": "br.smartpro.smartlider",
-      "versionCode": 10,
+      "versionCode": 8,
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
@@ -64,8 +64,8 @@
         {
           "android": {
             "minSdkVersion": 24,
-            "targetSdkVersion": 36,
-            "compileSdkVersion": 36,
+            "targetSdkVersion": 35,
+            "compileSdkVersion": 35,
             "enableMinifyInReleaseBuilds": true,
             "enableShrinkResourcesInReleaseBuilds": true
           }
