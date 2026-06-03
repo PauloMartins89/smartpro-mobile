@@ -16,7 +16,7 @@
     },
     "android": {
       "package": "br.smartpro.smartlider",
-      "versionCode": 14,
+      "versionCode": 15,
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
@@ -62,7 +62,8 @@
           }
         }
       ],
-      ["./plugins/withAbiFilters", { "abiFilters": ["arm64-v8a", "armeabi-v7a"] }]
+      ["./plugins/withAbiFilters", { "abiFilters": ["arm64-v8a", "armeabi-v7a"] }],
+      ["./plugins/withSplashBackground", { "color": "#0B1A3B" }]
     ],
     "experiments": {
       "typedRoutes": true
