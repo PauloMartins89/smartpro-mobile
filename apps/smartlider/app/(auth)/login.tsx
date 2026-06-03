@@ -6,8 +6,11 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
+import Constants from 'expo-constants'
 import { supabase } from '../../src/lib/supabase'
 import { C } from '../../src/lib/theme'
+
+const APP_VERSION = Constants.expoConfig?.version ?? '1.0.5'
 
 function deriveEmail(matricula: string) {
   return `${matricula.trim()}@lider.smartpro`
@@ -175,7 +178,7 @@ export default function LoginScreen() {
             <View style={styles.dividerLine} />
           </View>
 
-          <Text style={styles.version}>SmartLider v1.0.1</Text>
+          <Text style={styles.version}>SmartLider v{APP_VERSION}</Text>
           <View style={styles.connRow}>
             <Text style={styles.connText}>Operação conectada à </Text>
             <Text style={styles.connBrand}>SmartPro</Text>
