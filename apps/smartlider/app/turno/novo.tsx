@@ -11,6 +11,7 @@ import useLiderStore, { type Turno } from '../../src/store/useLiderStore'
 import useSyncStore from '../../src/store/useSyncStore'
 import { isClearlyOffline } from '../../src/lib/network'
 import { C, TURNO_LABEL, todayISO, fmtDate } from '../../src/lib/theme'
+import { captureClima } from '../../src/lib/clima'
 
 /** Sugestao de turno pelo horario atual */
 function turnoByHora(): Turno {
@@ -120,6 +121,8 @@ export default function IniciarTurnoScreen() {
           lider_nome:  liderPerfil.nome,
           data, turno, status: 'aberto',
         })
+        // Captura clima automaticamente (não bloqueia navegação)
+        captureClima({ turnoId, workspaceId: liderPerfil.workspace_id!, equipId: liderPerfil.equipe_id })
         Alert.alert('Turno criado offline', 'Será sincronizado quando a conexão voltar.')
         router.replace('/(tabs)')
         return
@@ -181,6 +184,9 @@ export default function IniciarTurnoScreen() {
         turno,
         status: 'aberto',
       })
+      // Captura clima automaticamente após iniciar turno (não bloqueia)
+      const { data: { session: s2 } } = await supabase.auth.getSession()
+      captureClima({ turnoId, workspaceId: liderPerfil.workspace_id!, equipId: liderPerfil.equipe_id, userId: s2?.user?.id })
       router.replace('/(tabs)')
     } catch {
       Alert.alert('Erro', 'Falha ao iniciar turno. Verifique sua conexao.')
