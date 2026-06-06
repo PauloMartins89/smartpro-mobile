@@ -68,29 +68,50 @@ export default function DashboardScreen() {
       setLoading(false)
       return
     }
-
     try {
+      const turnoData  = turnoAtivo.data                    // YYYY-MM-DD
+      const equipeId   = turnoAtivo.equipe_id
+
+      // Datas para refeições: hoje OU amanhã (pedido costuma ser para o próximo dia)
+      const d1 = new Date(turnoData);
+      const d0 = new Date(turnoData); d0.setDate(d0.getDate() - 1)
+      const d2 = new Date(turnoData); d2.setDate(d2.getDate() + 1)
+      const fmtD = (d: Date) => d.toISOString().slice(0, 10)
+
       const [
         { count: presentes },
-        { count: total },
+        { count: totalColaboradores },
         { count: maquinas },
         { data: prodData },
         { count: refeicoes },
       ] = await Promise.all([
-        supabase.from('lider_mao_obra').select('*', { count: 'exact', head: true }).eq('turno_id', turnoAtivo.id).eq('presente', true),
-        supabase.from('lider_mao_obra').select('*', { count: 'exact', head: true }).eq('turno_id', turnoAtivo.id),
-        supabase.from('lider_apontamentos_maquina').select('*', { count: 'exact', head: true }).eq('turno_id', turnoAtivo.id),
-        supabase.from('lider_produtividade_equipe').select('realizado_ha, meta_ha').eq('turno_id', turnoAtivo.id),
-        supabase.from('refei_solicitacoes').select('*', { count: 'exact', head: true }).eq('workspace_id', workspaceId).eq('data_refeicao', turnoAtivo.data).neq('status', 'rascunho'),
+        // Presentes: linhas de mão de obra marcadas como presente
+        supabase.from('lider_mao_obra').select('*', { count: 'exact', head: true })
+          .eq('turno_id', turnoAtivo.id).eq('presente', true),
+        // Total real da equipe: colaboradores ativos cadastrados
+        supabase.from('lider_colaboradores').select('*', { count: 'exact', head: true })
+          .eq('equipe_id', equipeId).eq('ativo', true),
+        // Máquinas: apontamentos do turno
+        supabase.from('lider_apontamentos_maquina').select('*', { count: 'exact', head: true })
+          .eq('turno_id', turnoAtivo.id),
+        // Produtividade
+        supabase.from('lider_produtividade_equipe').select('realizado_ha, meta_ha')
+          .eq('turno_id', turnoAtivo.id),
+        // Refeições: pedidos para ontem, hoje ou amanhã (captura pedido antecipado)
+        supabase.from('refei_solicitacoes').select('*', { count: 'exact', head: true })
+          .eq('workspace_id', workspaceId)
+          .gte('data_refeicao', fmtD(d0))
+          .lte('data_refeicao', fmtD(d2))
+          .neq('status', 'rascunho'),
       ])
 
       const ha_realizado = prodData?.reduce((s, r) => s + (r.realizado_ha ?? 0), 0) ?? 0
       const ha_meta      = prodData?.reduce((s, r) => s + (r.meta_ha      ?? 0), 0) ?? 0
 
       const novosDados = {
-        presentes:             presentes ?? 0,
-        total_colaboradores:   total     ?? 0,
-        maquinas_ativas:       maquinas  ?? 0,
+        presentes:             presentes            ?? 0,
+        total_colaboradores:   totalColaboradores   ?? 0,
+        maquinas_ativas:       maquinas             ?? 0,
         ha_realizado,
         ha_meta,
         refeicoes_solicitadas: refeicoes ?? 0,
@@ -121,7 +142,10 @@ export default function DashboardScreen() {
 
   useEffect(() => { carregar() }, [carregar, dashRefreshKey])
 
-  const efic = dados?.ha_meta ? Math.round((dados.ha_realizado / dados.ha_meta) * 100) : 0
+  const efic    = dados?.ha_meta ? Math.round((dados.ha_realizado / dados.ha_meta) * 100) : 0
+  const haReal  = dados ? Number(dados.ha_realizado).toFixed(1) : '0.0'
+  const haMeta  = dados ? Number(dados.ha_meta).toFixed(1)      : '0.0'
+  const haValue = dados?.ha_meta ? `${haReal}/${haMeta}` : haReal
 
   return (
     <ScrollView
@@ -147,8 +171,8 @@ export default function DashboardScreen() {
         : (
           <View style={st.kpiGrid}>
             <KpiCard icon="people"     label="Presença"  value={`${dados?.presentes ?? 0}/${dados?.total_colaboradores ?? 0}`} sub="colaboradores" color={C.green}   iconBg={C.greenBg}  pct={dados?.total_colaboradores ? (dados.presentes / dados.total_colaboradores) * 100 : 0} />
-            <KpiCard icon="construct"  label="Máquinas"  value={String(dados?.maquinas_ativas ?? 0)}                           sub="em operação"  color={C.blue}    iconBg={C.blueBg}   pct={null} />
-            <KpiCard icon="leaf"       label="Área (ha)" value={`${dados?.ha_realizado}/${dados?.ha_meta}`}                     sub={`${efic}% da meta`} color={efic >= 100 ? C.green : efic >= 70 ? C.yellow : C.red} iconBg={C.greenBg} pct={efic} />
+            <KpiCard icon="construct"  label="Máquinas"  value={String(dados?.maquinas_ativas ?? 0)}                           sub="apontamentos"  color={C.blue}    iconBg={C.blueBg}   pct={null} />
+            <KpiCard icon="leaf"       label="Área (ha)" value={haValue}                                                        sub={dados?.ha_meta ? `${efic}% da meta` : 'sem meta'} color={efic >= 100 ? C.green : efic >= 70 ? C.yellow : C.red} iconBg={C.greenBg} pct={dados?.ha_meta ? efic : null} />
             <KpiCard icon="restaurant" label="Refeições" value={String(dados?.refeicoes_solicitadas ?? 0)}                     sub="solicitadas"  color="#F97316"   iconBg="#FFEDD5"    pct={null} />
           </View>
         )
@@ -203,7 +227,7 @@ function KpiCard({ icon, label, value, sub, color, iconBg, pct }: {
         </View>
         <Text style={st.kpiLabel}>{label}</Text>
       </View>
-      <Text style={st.kpiValue}>{value}</Text>
+      <Text style={st.kpiValue} adjustsFontSizeToFit numberOfLines={1}>{value}</Text>
       <Text style={st.kpiSub}>{sub}</Text>
       {pct !== null && (
         <View style={st.barBg}>
