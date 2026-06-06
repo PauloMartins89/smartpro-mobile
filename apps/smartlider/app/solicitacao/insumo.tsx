@@ -80,7 +80,7 @@ export default function SolicitacaoInsumoScreen() {
       id, turno_id: turnoAtivo.id, workspace_id: workspaceId,
       produto_id: produto.id, quantidade: parseFloat(qtd) || 0,
       unidade: produto.unidade, urgencia, data_necessaria: dataNec || null,
-      status: 'pendente', observacao: obs, criado_por: user.user?.id,
+      status: 'pendente', observacao: obs,
     }
     try {
       if (await isClearlyOffline()) throw new Error('offline')
