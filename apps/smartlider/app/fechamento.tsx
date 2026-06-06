@@ -18,6 +18,7 @@ interface Resumo {
   maquinas:  number
   insumos:   number
   refeicoes: number
+  ocorrencias: number
   avaliacao: number | null
   ha_realizado: number
   ha_meta:      number
@@ -35,22 +36,35 @@ export default function FechamentoScreen() {
 
   useEffect(() => {
     if (!turnoAtivo) return
+    const workspaceId = useLiderStore.getState().workspaceId
+    const base = new Date(turnoAtivo.data)
+    const d0   = new Date(base); d0.setDate(d0.getDate() - 1)
+    const d2   = new Date(base); d2.setDate(d2.getDate() + 1)
+    const fmtD = (d: Date) => d.toISOString().slice(0, 10)
+
     Promise.all([
       supabase.from('lider_mao_obra').select('presente').eq('turno_id', turnoAtivo.id),
       supabase.from('lider_apontamentos_maquina').select('id', { count: 'exact', head: true }).eq('turno_id', turnoAtivo.id),
       supabase.from('lider_apontamentos_insumo').select('id', { count: 'exact', head: true }).eq('turno_id', turnoAtivo.id),
-      supabase.from('lider_produtividade_equipe').select('area_realizada, area_meta').eq('turno_id', turnoAtivo.id),
+      supabase.from('lider_produtividade_equipe').select('realizado_ha, meta_ha').eq('turno_id', turnoAtivo.id),
       supabase.from('lider_avaliacoes_equipe').select('nota_geral').eq('turno_id', turnoAtivo.id).maybeSingle(),
-    ]).then(([{ data: mo }, { count: maq }, { count: ins }, { data: prod }, { data: aval }]) => {
+      supabase.from('refei_solicitacoes').select('*', { count: 'exact', head: true })
+        .eq('workspace_id', workspaceId)
+        .gte('data_refeicao', fmtD(d0))
+        .lte('data_refeicao', fmtD(d2))
+        .neq('status', 'rascunho'),
+      supabase.from('lider_ocorrencias').select('*', { count: 'exact', head: true }).eq('turno_id', turnoAtivo.id),
+    ]).then(([{ data: mo }, { count: maq }, { count: ins }, { data: prod }, { data: aval }, { count: refei }, { count: ocorr }]) => {
       setResumo({
         presentes:    (mo ?? []).filter(r => r.presente).length,
         ausentes:     (mo ?? []).filter(r => !r.presente).length,
-        maquinas:     maq  ?? 0,
-        insumos:      ins  ?? 0,
-        refeicoes:    0,
+        maquinas:     maq   ?? 0,
+        insumos:      ins   ?? 0,
+        refeicoes:    refei ?? 0,
+        ocorrencias:  ocorr ?? 0,
         avaliacao:    aval?.nota_geral ?? null,
-        ha_realizado: (prod ?? []).reduce((s, r) => s + (r.area_realizada ?? 0), 0),
-        ha_meta:      (prod ?? []).reduce((s, r) => s + (r.area_meta      ?? 0), 0),
+        ha_realizado: (prod ?? []).reduce((s, r) => s + (r.realizado_ha ?? 0), 0),
+        ha_meta:      (prod ?? []).reduce((s, r) => s + (r.meta_ha      ?? 0), 0),
       })
       setLoading(false)
     }).catch(() => {
@@ -62,6 +76,7 @@ export default function FechamentoScreen() {
           maquinas:     turnoStats.maquinas,
           insumos:      useSyncStore.getState().queue.filter(r => r.table === 'lider_apontamentos_insumo' && r.payload.turno_id === turnoAtivo.id).length,
           refeicoes:    turnoStats.refeicoes,
+          ocorrencias:  0,
           avaliacao:    turnoStats.avaliacao_media || null,
           ha_realizado: turnoStats.ha_realizado,
           ha_meta:      turnoStats.ha_meta,
@@ -134,23 +149,25 @@ export default function FechamentoScreen() {
 
         {/* Cards de resumo */}
         <View style={styles.grid}>
-          <ResumoCard icon="people"     label="Presentes"  value={String(resumo?.presentes ?? 0)} color={C.green}  />
-          <ResumoCard icon="warning"    label="Ausentes"   value={String(resumo?.ausentes  ?? 0)} color={C.red}    />
-          <ResumoCard icon="construct"  label="Máquinas"   value={String(resumo?.maquinas  ?? 0)} color={C.blue}   />
-          <ResumoCard icon="flask"      label="Insumos"    value={String(resumo?.insumos   ?? 0)} color={C.yellow} />
+          <ResumoCard icon="people"     label="Presentes"   value={String(resumo?.presentes   ?? 0)} color={C.green}  />
+          <ResumoCard icon="warning"    label="Ausentes"    value={String(resumo?.ausentes    ?? 0)} color={C.red}    />
+          <ResumoCard icon="construct"  label="Máquinas"    value={String(resumo?.maquinas    ?? 0)} color={C.blue}   />
+          <ResumoCard icon="flask"      label="Insumos"     value={String(resumo?.insumos     ?? 0)} color={C.yellow} />
+          <ResumoCard icon="restaurant" label="Refeições"   value={String(resumo?.refeicoes   ?? 0)} color="#F97316" />
+          <ResumoCard icon="warning-outline" label="Ocorrências" value={String(resumo?.ocorrencias ?? 0)} color={resumo?.ocorrencias ? C.red : C.textSub} />
         </View>
 
         {/* Produtividade */}
         <View style={styles.prodCard}>
           <Text style={styles.prodTitle}>Produtividade</Text>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-            <Text style={styles.prodLabel}>{resumo?.ha_realizado ?? 0} ha realizados</Text>
+            <Text style={styles.prodLabel}>{Number(resumo?.ha_realizado ?? 0).toFixed(1)} ha realizados</Text>
             <Text style={[styles.prodLabel, { color: efic >= 100 ? C.greenText : efic >= 70 ? C.yellow : C.red }]}>{efic}%</Text>
           </View>
           <View style={styles.barBg}>
             <View style={[styles.barFill, { width: `${Math.min(efic, 100)}%`, backgroundColor: efic >= 100 ? C.green : efic >= 70 ? C.yellow : C.red }]} />
           </View>
-          <Text style={styles.prodMeta}>Meta: {resumo?.ha_meta ?? 0} ha</Text>
+          <Text style={styles.prodMeta}>Meta: {Number(resumo?.ha_meta ?? 0).toFixed(1)} ha</Text>
         </View>
 
         {/* Avaliação */}
