@@ -60,7 +60,7 @@ function SolCard({ sol }) {
         )}
       </View>
       {sol.observacoes ? (
-        <Text style={st.obs} numberOfLines={1}>{'Obs: ' + sol.obs}</Text>
+        <Text style={st.obs} numberOfLines={1}>{'Obs: ' + sol.observacoes}</Text>
       ) : null}
       {sol.motivo_reprovacao ? (
         <Text style={st.motivo}>{'Motivo: ' + sol.motivo_reprovacao}</Text>
