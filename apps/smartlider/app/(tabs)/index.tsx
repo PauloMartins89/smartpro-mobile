@@ -249,7 +249,7 @@ function KpiCard({ icon, label, value, sub, color, iconBg, pct }: {
     <View style={st.kpiCard}>
       <View style={st.kpiTop}>
         <View style={[st.kpiIconWrap, { backgroundColor: iconBg }]}>
-          <Ionicons name={icon as any} size={18} color={color} />
+          <Ionicons name={icon as any} size={14} color={color} />
         </View>
         <Text style={st.kpiLabel}>{label}</Text>
       </View>
@@ -282,13 +282,13 @@ const st = StyleSheet.create({
 
   // KPI
   loadingWrap: { paddingVertical: 40, alignItems: 'center' },
-  kpiGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 24 },
-  kpiCard:     { flex: 1, minWidth: '44%', backgroundColor: '#fff', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: C.border, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
-  kpiTop:      { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  kpiIconWrap: { width: 34, height: 34, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginRight: 8 },
-  kpiLabel:    { fontSize: 12.5, color: C.textSub, fontWeight: '600', flex: 1 },
-  kpiValue:    { fontSize: 28, fontWeight: '900', color: C.text, marginBottom: 2 },
-  kpiSub:      { fontSize: 11, color: C.textMuted, marginBottom: 8 },
+  kpiGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
+  kpiCard:     { width: '31%', backgroundColor: '#fff', borderRadius: 14, padding: 10, borderWidth: 1, borderColor: C.border, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  kpiTop:      { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  kpiIconWrap: { width: 28, height: 28, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginRight: 6 },
+  kpiLabel:    { fontSize: 11, color: C.textSub, fontWeight: '600', flex: 1 },
+  kpiValue:    { fontSize: 22, fontWeight: '900', color: C.text, marginBottom: 2 },
+  kpiSub:      { fontSize: 10, color: C.textMuted, marginBottom: 6 },
   barBg:       { height: 5, backgroundColor: C.border, borderRadius: 3 },
   barFill:     { height: 5, borderRadius: 3 },
 
