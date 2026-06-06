@@ -4,6 +4,11 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { supabase } from '../lib/supabase'
 
+const MAX_ATTEMPTS = 10
+
+// Códigos de erro que NUNCA vão resolver sozinhos (schema, coluna inexistente, etc.)
+const FATAL_CODES = ['PGRST204', 'PGRST205', '42703', '42P01']
+
 export type SyncStatus = 'pending' | 'synced' | 'syncing' | 'error'
 
 export interface PendingRecord {
@@ -59,10 +64,17 @@ const useSyncStore = create<SyncStore>()(
                 : await supabase.from(record.table).update(record.payload).eq('id', record.payload.id)
 
             if (error) {
+              // Erro fatal de schema — nunca vai resolver, descarta imediatamente
+              if (FATAL_CODES.includes(error.code)) {
+                console.warn(`[sync] ERRO FATAL (descartando) tabela=${record.table} id=${record.id} | code=${error.code} msg=${error.message}`)
+                get().removeFromQueue(record.id)
               // 23505 = unique violation → dado já existe no banco (sync anterior ok)
-              if (error.code === '23505') {
+              } else if (error.code === '23505') {
                 console.log(`[sync] já existe no banco, removendo da fila | tabela=${record.table} id=${record.id}`)
                 ok++
+                get().removeFromQueue(record.id)
+              } else if (record.attempts + 1 >= MAX_ATTEMPTS) {
+                console.warn(`[sync] MAX_ATTEMPTS atingido, descartando | tabela=${record.table} id=${record.id}`)
                 get().removeFromQueue(record.id)
               } else {
                 fail++
