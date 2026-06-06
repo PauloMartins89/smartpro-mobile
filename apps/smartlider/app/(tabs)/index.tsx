@@ -25,6 +25,8 @@ interface DashData {
   ha_realizado:          number
   ha_meta:               number
   refeicoes_solicitadas: number
+  insumos_apontados:     number
+  ocorrencias:           number
 }
 
 const ACOES = [
@@ -53,7 +55,7 @@ export default function DashboardScreen() {
     if (!turnoAtivo) return
     isRefresh ? setRefresh(true) : setLoading(true)
 
-    // Se offline, usa cache do turnoStats
+      // Se offline, usa cache do turnoStats
     if (!isRefresh && await isClearlyOffline()) {
       if (turnoStats) {
         setDados({
@@ -63,6 +65,8 @@ export default function DashboardScreen() {
           ha_realizado:          turnoStats.ha_realizado         ?? 0,
           ha_meta:               turnoStats.ha_meta              ?? 0,
           refeicoes_solicitadas: turnoStats.refeicoes            ?? 0,
+          insumos_apontados:     0,
+          ocorrencias:           0,
         })
       }
       setLoading(false)
@@ -84,6 +88,8 @@ export default function DashboardScreen() {
         { count: maquinas },
         { data: prodData },
         { count: refeicoes },
+        { count: insumos },
+        { count: ocorrencias },
       ] = await Promise.all([
         // Presentes: linhas de mão de obra marcadas como presente
         supabase.from('lider_mao_obra').select('*', { count: 'exact', head: true })
@@ -103,6 +109,12 @@ export default function DashboardScreen() {
           .gte('data_refeicao', fmtD(d0))
           .lte('data_refeicao', fmtD(d2))
           .neq('status', 'rascunho'),
+        // Insumos apontados no turno
+        supabase.from('lider_apontamentos_insumo').select('*', { count: 'exact', head: true })
+          .eq('turno_id', turnoAtivo.id),
+        // Ocorrências do turno
+        supabase.from('lider_ocorrencias').select('*', { count: 'exact', head: true })
+          .eq('turno_id', turnoAtivo.id),
       ])
 
       const ha_realizado = prodData?.reduce((s, r) => s + (r.realizado_ha ?? 0), 0) ?? 0
@@ -114,7 +126,9 @@ export default function DashboardScreen() {
         maquinas_ativas:       maquinas             ?? 0,
         ha_realizado,
         ha_meta,
-        refeicoes_solicitadas: refeicoes ?? 0,
+        refeicoes_solicitadas: refeicoes  ?? 0,
+        insumos_apontados:     insumos    ?? 0,
+        ocorrencias:           ocorrencias ?? 0,
       }
       setDados(novosDados)
       // Persiste no store para uso offline futuro
@@ -134,7 +148,7 @@ export default function DashboardScreen() {
         updatedAt:            new Date().toISOString(),
       })
     } catch {
-      setDados({ presentes: 0, total_colaboradores: 0, maquinas_ativas: 0, ha_realizado: 0, ha_meta: 0, refeicoes_solicitadas: 0 })
+      setDados({ presentes: 0, total_colaboradores: 0, maquinas_ativas: 0, ha_realizado: 0, ha_meta: 0, refeicoes_solicitadas: 0, insumos_apontados: 0, ocorrencias: 0 })
     } finally {
       isRefresh ? setRefresh(false) : setLoading(false)
     }
@@ -147,6 +161,10 @@ export default function DashboardScreen() {
   const haMeta  = dados ? Number(dados.ha_meta).toFixed(1)      : '0.0'
   const haValue = dados?.ha_meta ? `${haReal}/${haMeta}` : haReal
 
+  const saudacao = turnoAtivo?.turno === 'noite' ? 'Boa noite' : turnoAtivo?.turno === 'tarde' ? 'Boa tarde' : 'Bom dia'
+  const liderPerfil = useLiderStore.getState().liderPerfil
+  const primeiroNome = liderPerfil?.nome?.split(' ')[0] ?? ''
+
   return (
     <ScrollView
       style={st.root}
@@ -154,6 +172,12 @@ export default function DashboardScreen() {
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refresh} onRefresh={() => carregar(true)} colors={[C.primary]} />}
     >
+      {/* Saudação */}
+      <View style={st.greetRow}>
+        <Text style={st.greetText}>{saudacao}{primeiroNome ? `, ${primeiroNome}` : ''} 👋</Text>
+        <Text style={st.greetSub}>Líder Operacional</Text>
+      </View>
+
       {/* Resumo de Hoje */}
       <View style={st.sectionHeader}>
         <View style={st.sectionTitleRow}>
@@ -170,10 +194,12 @@ export default function DashboardScreen() {
         ? <View style={st.loadingWrap}><ActivityIndicator color={C.primary} size="large" /></View>
         : (
           <View style={st.kpiGrid}>
-            <KpiCard icon="people"     label="Presença"  value={`${dados?.presentes ?? 0}/${dados?.total_colaboradores ?? 0}`} sub="colaboradores" color={C.green}   iconBg={C.greenBg}  pct={dados?.total_colaboradores ? (dados.presentes / dados.total_colaboradores) * 100 : 0} />
-            <KpiCard icon="construct"  label="Máquinas"  value={String(dados?.maquinas_ativas ?? 0)}                           sub="apontamentos"  color={C.blue}    iconBg={C.blueBg}   pct={null} />
-            <KpiCard icon="leaf"       label="Área (ha)" value={haValue}                                                        sub={dados?.ha_meta ? `${efic}% da meta` : 'sem meta'} color={efic >= 100 ? C.green : efic >= 70 ? C.yellow : C.red} iconBg={C.greenBg} pct={dados?.ha_meta ? efic : null} />
-            <KpiCard icon="restaurant" label="Refeições" value={String(dados?.refeicoes_solicitadas ?? 0)}                     sub="solicitadas"  color="#F97316"   iconBg="#FFEDD5"    pct={null} />
+            <KpiCard icon="people"     label="Presença"   value={`${dados?.presentes ?? 0}/${dados?.total_colaboradores ?? 0}`} sub="colaboradores" color={C.green}   iconBg={C.greenBg}  pct={dados?.total_colaboradores ? (dados.presentes / dados.total_colaboradores) * 100 : 0} />
+            <KpiCard icon="construct"  label="Máquinas"   value={String(dados?.maquinas_ativas ?? 0)}                           sub="apontamentos"  color={C.blue}    iconBg={C.blueBg}   pct={null} />
+            <KpiCard icon="leaf"       label="Área (ha)"  value={haValue}                                                        sub={dados?.ha_meta ? `${efic}% da meta` : 'sem meta'} color={efic >= 100 ? C.green : efic >= 70 ? C.yellow : C.red} iconBg={C.greenBg} pct={dados?.ha_meta ? efic : null} />
+            <KpiCard icon="restaurant" label="Refeições"  value={String(dados?.refeicoes_solicitadas ?? 0)}                     sub="solicitadas"   color="#F97316"   iconBg="#FFEDD5"    pct={null} />
+            <KpiCard icon="flask"      label="Insumos"    value={String(dados?.insumos_apontados ?? 0)}                         sub="apontamentos"  color={C.purple ?? '#8B5CF6'} iconBg="#EDE9FE"  pct={null} />
+            <KpiCard icon="warning"    label="Ocorrências" value={String(dados?.ocorrencias ?? 0)}                               sub={dados?.ocorrencias ? 'ver registro' : 'sem ocorr.'} color={dados?.ocorrencias ? C.red : C.textSub} iconBg={dados?.ocorrencias ? C.redBg : C.bgMuted} pct={null} />
           </View>
         )
       }
@@ -242,9 +268,13 @@ const st = StyleSheet.create({
   root:  { flex: 1, backgroundColor: C.bg },
   scroll: { padding: 16, paddingTop: 20, paddingBottom: 120 },
 
+  // Saudação
+  greetRow:  { marginBottom: 18 },
+  greetText: { fontSize: 20, fontWeight: '800', color: C.text },
+  greetSub:  { fontSize: 12, color: C.textSub, marginTop: 2 },
+
   // Section headers
-  sectionHeader:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
-  sectionTitleRow:  { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  sectionHeader:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },  sectionTitleRow:  { flexDirection: 'row', alignItems: 'center', gap: 7 },
   sectionTitleRow2: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 8, marginBottom: 12 },
   sectionTitle:     { fontSize: 15, fontWeight: '800', color: C.text },
   dateChip:         { flexDirection: 'row', alignItems: 'center', gap: 4 },
