@@ -41,10 +41,19 @@ export default function RightDrawer({ visible, onClose, turnoAtivo }: Props) {
   async function atualizarDoServidor() {
     setRefreshing(true)
     try {
-      const tid = turnoAtivo.id
+      const tid      = turnoAtivo.id
+      const equipeId = turnoAtivo.equipe_id
+      const workspaceId = useLiderStore.getState().workspaceId
+
+      // Janela de datas para refeições (ontem–amanhã, cobre pedidos antecipados)
+      const base = new Date(turnoAtivo.data)
+      const d0   = new Date(base); d0.setDate(d0.getDate() - 1)
+      const d2   = new Date(base); d2.setDate(d2.getDate() + 1)
+      const fmtD = (d: Date) => d.toISOString().slice(0, 10)
+
       const [
         { count: presentes },
-        { count: total },
+        { count: totalColaboradores },
         { count: maquinas },
         { data: prodData },
         { count: refeicoes },
@@ -56,10 +65,14 @@ export default function RightDrawer({ visible, onClose, turnoAtivo }: Props) {
         { count: insumos_divergentes },
       ] = await Promise.all([
         supabase.from('lider_mao_obra').select('*', { count: 'exact', head: true }).eq('turno_id', tid).eq('presente', true),
-        supabase.from('lider_mao_obra').select('*', { count: 'exact', head: true }).eq('turno_id', tid),
+        supabase.from('lider_colaboradores').select('*', { count: 'exact', head: true }).eq('equipe_id', equipeId).eq('ativo', true),
         supabase.from('lider_apontamentos_maquina').select('*', { count: 'exact', head: true }).eq('turno_id', tid),
         supabase.from('lider_produtividade_equipe').select('realizado_ha, meta_ha').eq('turno_id', tid),
-        supabase.from('lider_solicitacoes_refeicao').select('*', { count: 'exact', head: true }).eq('turno_id', tid),
+        supabase.from('refei_solicitacoes').select('*', { count: 'exact', head: true })
+          .eq('workspace_id', workspaceId)
+          .gte('data_refeicao', fmtD(d0))
+          .lte('data_refeicao', fmtD(d2))
+          .neq('status', 'rascunho'),
         supabase.from('lider_solicitacoes_epi').select('*', { count: 'exact', head: true }).eq('turno_id', tid).eq('status', 'pendente'),
         supabase.from('lider_solicitacoes_insumo').select('*', { count: 'exact', head: true }).eq('turno_id', tid).eq('status', 'pendente'),
         supabase.from('lider_afericoes').select('*', { count: 'exact', head: true }).eq('turno_id', tid).eq('status', 'reprovado'),
@@ -75,9 +88,9 @@ export default function RightDrawer({ visible, onClose, turnoAtivo }: Props) {
         : 0
 
       setTurnoStats({
-        presentes:            presentes  ?? 0,
-        total_colaboradores:  total      ?? 0,
-        maquinas:             maquinas   ?? 0,
+        presentes:            presentes           ?? 0,
+        total_colaboradores:  totalColaboradores  ?? 0,
+        maquinas:             maquinas            ?? 0,
         ha_realizado,
         ha_meta,
         refeicoes:            refeicoes  ?? 0,
@@ -98,6 +111,8 @@ export default function RightDrawer({ visible, onClose, turnoAtivo }: Props) {
 
   const efic    = data?.ha_meta ? Math.round((data.ha_realizado / data.ha_meta) * 100) : 0
   const eficCor = efic >= 100 ? C.drawerGreen : efic >= 70 ? C.drawerYellow : C.drawerRed
+  const haReal  = Number(data?.ha_realizado ?? 0).toFixed(1)
+  const haMeta  = Number(data?.ha_meta      ?? 0).toFixed(1)
 
   // Formata quando foi atualizado
   function fmtUpdated(iso: string | null) {
@@ -188,8 +203,8 @@ export default function RightDrawer({ visible, onClose, turnoAtivo }: Props) {
                 <DrawerRow
                   icon="leaf"
                   label="Produtividade"
-                  value={`${data?.ha_realizado ?? 0} ha`}
-                  sub={data?.ha_meta ? `${efic}% da meta (${data.ha_meta} ha)` : 'sem meta'}
+                  value={`${haReal} ha`}
+                  sub={data?.ha_meta ? `${efic}% da meta (${haMeta} ha)` : 'sem meta'}
                   color={eficCor}
                 />
                 <DrawerRow
