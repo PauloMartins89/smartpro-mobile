@@ -78,7 +78,8 @@ export default function SolicitacaoInsumoScreen() {
     const id = uuidv4()
     const payload = {
       id, turno_id: turnoAtivo.id, workspace_id: workspaceId,
-      produto_id: produto.id, quantidade: parseFloat(qtd) || 0,
+      produto_id: produto.id, produto_nome: produto.nome,
+      quantidade: parseFloat(qtd) || 0,
       unidade: produto.unidade, urgencia, data_necessaria: dataNec || null,
       status: 'pendente', observacao: obs,
     }
