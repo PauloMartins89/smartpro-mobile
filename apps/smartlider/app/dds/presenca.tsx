@@ -79,7 +79,15 @@ export default function DDSPresencaScreen() {
       if (!registroId) {
         const { data: novo } = await supabase
           .from('dds_registros')
-          .insert({ workspace_id: workspaceId, turno_id: turnoAtivo.id, lider_id: liderId ?? null, tema_id: temaId, data: hoje })
+          .insert({
+            workspace_id: workspaceId,
+            turno_id:     turnoAtivo.id,
+            lider_id:     liderId ?? null,
+            lider_nome:   turnoAtivo.lider_nome ?? null,
+            equipe_nome:  turnoAtivo.equipe_nome ?? null,
+            tema_id:      temaId,
+            data:         hoje,
+          })
           .select('id')
           .single()
         registroId = novo?.id
