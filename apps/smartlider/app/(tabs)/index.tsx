@@ -38,6 +38,7 @@ const ACOES = [
   { icon: 'cube-outline',             label: 'Sol. Insumo',   sub: 'Solicitar',        route: '/solicitacao/insumo'               },
   { icon: 'shield-checkmark-outline', label: 'EPI',           sub: 'Controlar',        route: '/solicitacao/epi'                  },
   { icon: 'analytics-outline',        label: 'Produtividade', sub: 'Acompanhar',       route: '/apontamento/produtividade-equipe' },
+  { icon: 'shield-half-outline',      label: 'DDS',           sub: 'Diálogo Seg.',     route: '/dds'                              },
 ] as const
 
 export default function DashboardScreen() {
