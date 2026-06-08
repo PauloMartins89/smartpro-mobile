@@ -2,7 +2,7 @@
   "expo": {
     "name": "SmartLider",
     "slug": "smartlider",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./assets/icon.png",
@@ -16,7 +16,7 @@
     },
     "android": {
       "package": "br.smartpro.smartlider",
-      "versionCode": 27,
+      "versionCode": 29,
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
