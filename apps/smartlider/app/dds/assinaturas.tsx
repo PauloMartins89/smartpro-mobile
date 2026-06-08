@@ -26,7 +26,7 @@ function strokesToSvg(strokes: number[][][]): string {
     return `M${fx.toFixed(0)},${fy.toFixed(0)} ${rest}`
   }).filter(Boolean)
   if (!paths.length) return ''
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${PAD_W}" height="${PAD_H}" viewBox="0 0 ${PAD_W} ${PAD_H}"><path d="${paths.join(' ')}" stroke="#0F172A" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${PAD_W}" height="${PAD_H}" viewBox="0 0 ${PAD_W} ${PAD_H}"><path d="${paths.join(' ')}" stroke="#000000" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`
 }
 
 // Renderiza os strokes como segmentos de linha usando Views rotacionados
@@ -54,7 +54,7 @@ function DrawingCanvas({ strokes }: { strokes: number[][][] }) {
             top: seg.y - 1.25,
             width: seg.len,
             height: 2.5,
-            backgroundColor: '#0F172A',
+            backgroundColor: '#000000',
             borderRadius: 2,
             transform: [{ rotate: `${seg.angle}deg` }, { translateX: 0 }],
             transformOrigin: '0 50%',
