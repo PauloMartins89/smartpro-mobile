@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native'
 import { useNavigation, useRouter, useLocalSearchParams } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../src/lib/supabase'
 import useLiderStore from '../../src/store/useLiderStore'
@@ -16,6 +17,7 @@ import { C } from '../../src/lib/theme'
 export default function DDSPresencaScreen() {
   const nav    = useNavigation()
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const { temaId, temaTitulo, temaCategoria } = useLocalSearchParams<{ temaId: string; temaTitulo: string; temaCategoria: string }>()
 
   const turnoAtivo  = useLiderStore(s => s.turnoAtivo)
@@ -111,7 +113,7 @@ export default function DDSPresencaScreen() {
   const qtdSel = selecionados.size
 
   return (
-    <ScrollView style={s.container} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+    <ScrollView style={s.container} contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}>
       {/* Header do tema */}
       <View style={s.temaBox}>
         <Text style={s.temaLabel}>Tema do DDS</Text>

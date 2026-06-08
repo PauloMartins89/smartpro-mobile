@@ -8,6 +8,7 @@ import {
   ActivityIndicator, Image, Alert,
 } from 'react-native'
 import { useNavigation, useRouter } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../src/lib/supabase'
 import useLiderStore from '../../src/store/useLiderStore'
@@ -24,6 +25,7 @@ const CAT_COLOR: Record<string, string> = {
 export default function DDSIndexScreen() {
   const nav         = useNavigation()
   const router      = useRouter()
+  const insets      = useSafeAreaInsets()
   const turnoAtivo  = useLiderStore(s => s.turnoAtivo)
   const workspaceId = useLiderStore(s => s.workspaceId)
 
@@ -65,7 +67,7 @@ export default function DDSIndexScreen() {
   )
 
   return (
-    <ScrollView style={s.container} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+    <ScrollView style={s.container} contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}>
 
       {/* Aviso: DDS já feito hoje */}
       {jaFeito && (

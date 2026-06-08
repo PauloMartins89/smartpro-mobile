@@ -9,6 +9,7 @@ import {
   ActivityIndicator, Alert, Dimensions,
 } from 'react-native'
 import { useNavigation, useRouter, useLocalSearchParams } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../src/lib/supabase'
 import { C } from '../../src/lib/theme'
@@ -79,6 +80,7 @@ export default function DDSAssinaturasScreen() {
   const currentStroke = useRef<number[][]>([])
   const padRef    = useRef<any>(null)
   const padOffset = useRef({ x: 0, y: 0 })
+  const insets    = useSafeAreaInsets()
 
   const atual = colaboradores[idx]
 
@@ -198,7 +200,7 @@ export default function DDSAssinaturasScreen() {
       </View>
 
       {/* Navegação inferior */}
-      <View style={s.footer}>
+      <View style={[s.footer, { paddingBottom: 16 + insets.bottom }]}>
         <TouchableOpacity style={s.btnVoltar} onPress={voltarAnterior} disabled={saving}>
           <Ionicons name="chevron-back" size={20} color={C.text} />
           <Text style={s.btnVoltarText}>{idx === 0 ? 'Voltar' : 'Anterior'}</Text>
@@ -239,7 +241,7 @@ const s = StyleSheet.create({
   linha:           { position: 'absolute', bottom: 40, left: 20, right: 20, height: 1, backgroundColor: C.border },
   btnLimpar:       { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8, paddingVertical: 4, paddingHorizontal: 8 },
   btnLimparText:   { fontSize: 13, color: C.textSub },
-  footer:          { flexDirection: 'row', gap: 12, padding: 16, paddingBottom: 32, borderTopWidth: 1, borderTopColor: C.border, backgroundColor: C.bgCard },
+  footer:          { flexDirection: 'row', gap: 12, padding: 16, paddingBottom: 16, borderTopWidth: 1, borderTopColor: C.border, backgroundColor: C.bgCard },
   btnVoltar:       { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 12, borderWidth: 1.5, borderColor: C.border, padding: 14 },
   btnVoltarText:   { fontSize: 15, fontWeight: '700', color: C.text },
   btnProximo:      { flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: C.navy, borderRadius: 12, padding: 14 },
