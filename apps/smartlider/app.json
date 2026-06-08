@@ -16,7 +16,7 @@
     },
     "android": {
       "package": "br.smartpro.smartlider",
-      "versionCode": 16,
+      "versionCode": 27,
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
@@ -69,9 +69,7 @@
       "typedRoutes": true
     },
     "owner": "paulo_martins",
-    "runtimeVersion": {
-      "policy": "sdkVersion"
-    },
+    "runtimeVersion": "exposdk:56.0.0",
     "updates": {
       "url": "https://u.expo.dev/1f379ffd-098a-4c7c-aa93-b729ed5dfdda",
       "enabled": true,

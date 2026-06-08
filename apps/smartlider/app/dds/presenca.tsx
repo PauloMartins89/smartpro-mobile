@@ -36,7 +36,7 @@ export default function DDSPresencaScreen() {
     const equipeId = turnoAtivo.equipe_id
     const { data } = await supabase
       .from('lider_colaboradores')
-      .select('id, nome, funcao')
+      .select('id, nome, cargo')
       .eq('equipe_id', equipeId)
       .eq('ativo', true)
       .order('nome')
@@ -143,7 +143,7 @@ export default function DDSPresencaScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={s.colabNome}>{c.nome}</Text>
-              {c.funcao ? <Text style={s.colabFuncao}>{c.funcao}</Text> : null}
+              {c.cargo ? <Text style={s.colabFuncao}>{c.cargo}</Text> : null}
             </View>
           </TouchableOpacity>
         )
