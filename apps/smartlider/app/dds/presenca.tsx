@@ -82,6 +82,7 @@ export default function DDSPresencaScreen() {
           .insert({
             workspace_id: workspaceId,
             turno_id:     turnoAtivo.id,
+            turno:        turnoAtivo.turno ?? null,
             lider_id:     liderId ?? null,
             lider_nome:   turnoAtivo.lider_nome ?? null,
             equipe_nome:  turnoAtivo.equipe_nome ?? null,
