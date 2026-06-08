@@ -7,9 +7,10 @@ import { useFeature } from '../../src/lib/useFeature'
 import { C } from '../../src/lib/theme'
 
 const ITEMS_FIXOS = [
-  { icon: 'map-outline',           label: 'Mapas de Campo',       route: '/mapa'        },
-  { icon: 'document-text-outline', label: 'Fechar Dia / Boletim', route: '/fechamento'  },
-  { icon: 'terminal-outline',      label: 'Diagnóstico / Logs',  route: '/diagnostico' },
+  { icon: 'shield-half-outline',       label: 'DDS',                route: '/dds'          },
+  { icon: 'map-outline',               label: 'Mapas de Campo',     route: '/mapa'         },
+  { icon: 'document-text-outline',     label: 'Fechar Dia / Boletim', route: '/fechamento' },
+  { icon: 'terminal-outline',          label: 'Diagnóstico / Logs',  route: '/diagnostico' },
 ]
 
 export default function MaisScreen() {
