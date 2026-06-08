@@ -77,10 +77,18 @@ export default function DDSAssinaturasScreen() {
   const [strokes, setStrokes] = useState<number[][][]>([])
   const [saving,  setSaving]  = useState(false)
   const currentStroke = useRef<number[][]>([])
+  const padRef    = useRef<any>(null)
+  const padOffset = useRef({ x: 0, y: 0 })
 
   const atual = colaboradores[idx]
 
   useEffect(() => { nav.setOptions({ title: `Assinatura ${idx + 1} / ${total}` }) }, [idx, total])
+
+  function medirPad() {
+    padRef.current?.measure((_x: number, _y: number, _w: number, _h: number, pageX: number, pageY: number) => {
+      padOffset.current = { x: pageX, y: pageY }
+    })
+  }
 
   // PanResponder para capturar toque
   const panResponder = useRef(
@@ -88,10 +96,10 @@ export default function DDSAssinaturasScreen() {
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder:  () => true,
       onPanResponderGrant: (_, g) => {
-        currentStroke.current = [[g.x0 - 24, g.y0 - 16]] // ajuste margem do canvas
+        currentStroke.current = [[g.x0 - padOffset.current.x, g.y0 - padOffset.current.y]]
       },
       onPanResponderMove: (_, g) => {
-        currentStroke.current.push([g.moveX - 24, g.moveY - 16])
+        currentStroke.current.push([g.moveX - padOffset.current.x, g.moveY - padOffset.current.y])
         setStrokes(prev => [...prev.slice(0, -1), [...currentStroke.current]])
       },
       onPanResponderRelease: () => {
@@ -171,7 +179,9 @@ export default function DDSAssinaturasScreen() {
         {/* Pad de assinatura */}
         <View style={s.padWrap}>
           <View
+            ref={padRef}
             style={s.pad}
+            onLayout={medirPad}
             {...panResponder.panHandlers}>
             <DrawingCanvas strokes={strokes} />
             {strokes.length === 0 && (
