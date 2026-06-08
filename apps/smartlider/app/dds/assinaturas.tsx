@@ -3,23 +3,21 @@
  * DDS — Tela 3: Coleta de assinaturas (uma por vez)
  * Usa PanResponder para capturar traço do dedo.
  */
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useFocusEffect } from 'expo-router'
 import {
   View, Text, StyleSheet, TouchableOpacity, PanResponder,
-  ActivityIndicator, Alert, Dimensions,
+  useWindowDimensions, ActivityIndicator, Alert,
 } from 'react-native'
 import { useNavigation, useRouter, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import * as ScreenOrientation from 'expo-screen-orientation'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../src/lib/supabase'
 import { C } from '../../src/lib/theme'
 
-const { width: SCREEN_W } = Dimensions.get('window')
-const PAD_W  = SCREEN_W - 48  // padding 16 * 2 + card padding 8 * 2
-const PAD_H  = 180
-
 // Converte array de strokes em SVG path data compacto
-function strokesToSvg(strokes: number[][][]): string {
+function strokesToSvg(strokes: number[][][], padW: number, padH: number): string {
   const paths = strokes.map(pts => {
     if (pts.length === 0) return ''
     const [fx, fy] = pts[0]
@@ -27,11 +25,11 @@ function strokesToSvg(strokes: number[][][]): string {
     return `M${fx.toFixed(0)},${fy.toFixed(0)} ${rest}`
   }).filter(Boolean)
   if (!paths.length) return ''
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${PAD_W}" height="${PAD_H}" viewBox="0 0 ${PAD_W} ${PAD_H}"><path d="${paths.join(' ')}" stroke="#000000" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${padW}" height="${padH}" viewBox="0 0 ${padW} ${padH}"><path d="${paths.join(' ')}" stroke="#000000" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`
 }
 
 // Renderiza os strokes como segmentos de linha usando Views rotacionados
-function DrawingCanvas({ strokes }: { strokes: number[][][] }) {
+function DrawingCanvas({ strokes, padW, padH }: { strokes: number[][][]; padW: number; padH: number }) {
   const segments: { x: number; y: number; len: number; angle: number }[] = []
   for (const pts of strokes) {
     for (let i = 0; i < pts.length - 1; i++) {
@@ -45,7 +43,7 @@ function DrawingCanvas({ strokes }: { strokes: number[][][] }) {
     }
   }
   return (
-    <View style={{ position: 'absolute', top: 0, left: 0, width: PAD_W, height: PAD_H }}>
+    <View style={{ position: 'absolute', top: 0, left: 0, width: padW, height: padH }}>
       {segments.map((seg, i) => (
         <View
           key={i}
@@ -74,6 +72,11 @@ export default function DDSAssinaturasScreen() {
   const colaboradores: { id: string; nome: string }[] = colabsParam ? JSON.parse(colabsParam) : []
   const total = colaboradores.length
 
+  const { width: W, height: H } = useWindowDimensions()
+  const isLandscape = W > H
+  const padW = W - 48
+  const padH = isLandscape ? H - 160 : 180
+
   const [idx,     setIdx]     = useState(0)
   const [strokes, setStrokes] = useState<number[][][]>([])
   const [saving,  setSaving]  = useState(false)
@@ -85,6 +88,12 @@ export default function DDSAssinaturasScreen() {
   const atual = colaboradores[idx]
 
   useEffect(() => { nav.setOptions({ title: `Assinatura ${idx + 1} / ${total}` }) }, [idx, total])
+
+  // Permite landscape nesta tela, volta para portrait ao sair
+  useFocusEffect(useCallback(() => {
+    ScreenOrientation.unlockAsync()
+    return () => { ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP) }
+  }, []))
 
   function medirPad() {
     padRef.current?.measure((_x: number, _y: number, _w: number, _h: number, pageX: number, pageY: number) => {
@@ -126,7 +135,7 @@ export default function DDSAssinaturasScreen() {
     }
     setSaving(true)
     try {
-      const svg = strokesToSvg(strokes)
+      const svg = strokesToSvg(strokes, padW, padH)
       await supabase.from('dds_assinaturas').insert({
         registro_id:     registroId,
         colaborador_id:  atual.id,
@@ -179,13 +188,13 @@ export default function DDSAssinaturasScreen() {
         <Text style={s.instrucao}>Assine no campo abaixo</Text>
 
         {/* Pad de assinatura */}
-        <View style={s.padWrap}>
+        <View style={[s.padWrap, { width: padW }]}>
           <View
             ref={padRef}
-            style={s.pad}
+            style={[s.pad, { width: padW, height: padH }]}
             onLayout={medirPad}
             {...panResponder.panHandlers}>
-            <DrawingCanvas strokes={strokes} />
+            <DrawingCanvas strokes={strokes} padW={padW} padH={padH} />
             {strokes.length === 0 && (
               <Text style={s.padPlaceholder}>← assine aqui →</Text>
             )}
@@ -229,9 +238,8 @@ const s = StyleSheet.create({
   contador:        { fontSize: 13, fontWeight: '700', color: C.textSub, marginBottom: 4 },
   nome:            { fontSize: 22, fontWeight: '900', color: C.text, textAlign: 'center', marginBottom: 6 },
   instrucao:       { fontSize: 13, color: C.textMuted, marginBottom: 24 },
-  padWrap:         { width: PAD_W, alignItems: 'flex-end' },
+  padWrap:         { alignItems: 'flex-end' },
   pad:             {
-    width: PAD_W, height: PAD_H,
     backgroundColor: '#fff',
     borderRadius: 14, borderWidth: 1, borderColor: C.border,
     overflow: 'hidden',
