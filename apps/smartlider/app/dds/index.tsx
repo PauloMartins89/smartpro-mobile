@@ -57,7 +57,7 @@ export default function DDSIndexScreen() {
 
   function continuar() {
     if (!selected) { Alert.alert('Selecione um tema', 'Escolha o tema do DDS antes de continuar.'); return }
-    router.push({ pathname: '/dds/presenca', params: { temaId: selected.id, temaTitulo: selected.titulo, temaCategoria: selected.categoria } })
+    router.push({ pathname: '/dds/presenca', params: { temaId: selected.id, temaTitulo: selected.titulo, temaCategoria: selected.categoria, temaGrupoId: selected.grupo_id ?? '' } })
   }
 
   if (loading) return (

@@ -18,7 +18,7 @@ export default function DDSPresencaScreen() {
   const nav    = useNavigation()
   const router = useRouter()
   const insets = useSafeAreaInsets()
-  const { temaId, temaTitulo, temaCategoria } = useLocalSearchParams<{ temaId: string; temaTitulo: string; temaCategoria: string }>()
+  const { temaId, temaTitulo, temaCategoria, temaGrupoId } = useLocalSearchParams<{ temaId: string; temaTitulo: string; temaCategoria: string; temaGrupoId: string }>()
 
   const turnoAtivo  = useLiderStore(s => s.turnoAtivo)
   const workspaceId = useLiderStore(s => s.workspaceId)
@@ -97,7 +97,7 @@ export default function DDSPresencaScreen() {
             workspace_id: workspaceId,
             turno_id:     turnoAtivo.id,
             turno:        turnoAtivo.turno ?? null,
-            grupo_id:     turnoAtivo.equipe_id ?? null,
+            grupo_id:     temaGrupoId || null,
             lider_id:     liderId ?? null,
             lider_nome:   turnoAtivo.lider_nome ?? null,
             equipe_nome:  turnoAtivo.equipe_nome ?? null,
