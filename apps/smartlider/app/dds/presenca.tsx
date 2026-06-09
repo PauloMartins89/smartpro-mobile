@@ -86,6 +86,7 @@ export default function DDSPresencaScreen() {
         .select('id')
         .eq('turno_id', turnoAtivo.id)
         .eq('data', hoje)
+        .eq('tema_id', temaId)
         .maybeSingle()
 
       let registroId = existente?.id
