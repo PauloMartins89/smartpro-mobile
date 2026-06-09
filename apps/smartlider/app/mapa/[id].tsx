@@ -169,16 +169,21 @@ export default function MapaViewerScreen() {
       nav.setOptions({ title: data.nome })
 
       // Usa dimensões REAIS da imagem — garante decodificação em full-res
-      // O scaleVal inicial é ajustado para caber na tela
+      // O scaleVal inicial é ajustado para caber na tela, imagem centralizada
       Image.getSize(data.imagem_url, (iw, ih) => {
         const initScale = SCREEN_W / iw
+        // Centro da imagem fica no centro da tela:
+        //   visual_center = element_center + translate  →  translate = screen_center - element_center
+        const initTx = SCREEN_W / 2 - iw / 2
+        const initTy = SCREEN_H / 2 - ih / 2
         imgSizeRef.current = { w: iw, h: ih }
         setImgSize({ w: iw, h: ih })
-        scaleVal.value = initScale
-        savedScale.value = initScale
-        // Centraliza verticalmente
-        translateY.value = (SCREEN_H - ih * initScale) / 2
-        panSavedY.value  = (SCREEN_H - ih * initScale) / 2
+        scaleVal.value    = initScale
+        savedScale.value  = initScale
+        translateX.value  = initTx
+        translateY.value  = initTy
+        panSavedX.value   = initTx
+        panSavedY.value   = initTy
       })
       // Verifica cache local
       const info = await FileSystem.getInfoAsync(localPath(id))
