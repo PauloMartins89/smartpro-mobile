@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useFocusEffect } from 'expo-router'
 import {
   View, Text, StyleSheet, TouchableOpacity, PanResponder,
-  useWindowDimensions, ActivityIndicator, Alert,
+  useWindowDimensions, ActivityIndicator, Alert, PixelRatio,
 } from 'react-native'
 import { useNavigation, useRouter, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -16,20 +16,48 @@ import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../src/lib/supabase'
 import { C } from '../../src/lib/theme'
 
-// Converte array de strokes em SVG path data compacto
+// Converte array de strokes em SVG suavizado com Bézier quadrático (midpoint)
 function strokesToSvg(strokes: number[][][], padW: number, padH: number): string {
   const paths = strokes.map(pts => {
     if (pts.length === 0) return ''
-    const [fx, fy] = pts[0]
-    const rest = pts.slice(1).map(([x, y]) => `L${x.toFixed(0)},${y.toFixed(0)}`).join(' ')
-    return `M${fx.toFixed(0)},${fy.toFixed(0)} ${rest}`
+    if (pts.length === 1) {
+      const [x, y] = pts[0]
+      return `M${x.toFixed(1)},${y.toFixed(1)} l0.1,0`
+    }
+    // Algoritmo de ponto médio: suaviza o traço com curvas quadráticas
+    let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`
+    for (let i = 1; i < pts.length - 1; i++) {
+      const mx = ((pts[i][0] + pts[i + 1][0]) / 2).toFixed(1)
+      const my = ((pts[i][1] + pts[i + 1][1]) / 2).toFixed(1)
+      d += ` Q${pts[i][0].toFixed(1)},${pts[i][1].toFixed(1)} ${mx},${my}`
+    }
+    const last = pts[pts.length - 1]
+    d += ` L${last[0].toFixed(1)},${last[1].toFixed(1)}`
+    return d
   }).filter(Boolean)
   if (!paths.length) return ''
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${padW}" height="${padH}" viewBox="0 0 ${padW} ${padH}"><path d="${paths.join(' ')}" stroke="#000000" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+
+  // Auto-trim: bounding box de todos os pontos + padding
+  const PADDING = 8
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const pts of strokes) {
+    for (const [x, y] of pts) {
+      if (x < minX) minX = x; if (x > maxX) maxX = x
+      if (y < minY) minY = y; if (y > maxY) maxY = y
+    }
+  }
+  const vx = Math.max(0, minX - PADDING)
+  const vy = Math.max(0, minY - PADDING)
+  const vw = Math.min(padW, maxX - minX + PADDING * 2)
+  const vh = Math.min(padH, maxY - minY + PADDING * 2)
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${vw.toFixed(0)}" height="${vh.toFixed(0)}" viewBox="${vx.toFixed(0)} ${vy.toFixed(0)} ${vw.toFixed(0)} ${vh.toFixed(0)}" preserveAspectRatio="xMidYMid meet"><path d="${paths.join(' ')}" stroke="#1a1a1a" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`
 }
 
 // Renderiza os strokes como segmentos de linha usando Views rotacionados
+// Espessura ajustada ao PixelRatio do dispositivo para traço nítido
 function DrawingCanvas({ strokes, padW, padH }: { strokes: number[][][]; padW: number; padH: number }) {
+  const strokeW = Math.max(1.5, 2.5 / PixelRatio.get())
   const segments: { x: number; y: number; len: number; angle: number }[] = []
   for (const pts of strokes) {
     for (let i = 0; i < pts.length - 1; i++) {
@@ -37,7 +65,7 @@ function DrawingCanvas({ strokes, padW, padH }: { strokes: number[][][]; padW: n
       const [x2, y2] = pts[i + 1]
       const dx = x2 - x1, dy = y2 - y1
       const len = Math.sqrt(dx * dx + dy * dy)
-      if (len < 1) continue
+      if (len < 0.5) continue
       const angle = Math.atan2(dy, dx) * 180 / Math.PI
       segments.push({ x: x1, y: y1, len, angle })
     }
@@ -50,12 +78,12 @@ function DrawingCanvas({ strokes, padW, padH }: { strokes: number[][][]; padW: n
           style={{
             position: 'absolute',
             left: seg.x,
-            top: seg.y - 1.25,
-            width: seg.len,
-            height: 2.5,
-            backgroundColor: '#000000',
-            borderRadius: 2,
-            transform: [{ rotate: `${seg.angle}deg` }, { translateX: 0 }],
+            top: seg.y - strokeW / 2,
+            width: seg.len + strokeW,
+            height: strokeW,
+            backgroundColor: '#1a1a1a',
+            borderRadius: strokeW,
+            transform: [{ rotate: `${seg.angle}deg` }],
             transformOrigin: '0 50%',
           }}
         />
