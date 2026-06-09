@@ -80,14 +80,31 @@ export default function DDSAssinaturasScreen() {
   const [idx,     setIdx]     = useState(0)
   const [strokes, setStrokes] = useState<number[][][]>([])
   const [saving,  setSaving]  = useState(false)
+  const [jaAssinaramIds, setJaAssinaramIds] = useState<Set<string>>(new Set())
+  const [loadingCheck,   setLoadingCheck]   = useState(true)
   const currentStroke = useRef<number[][]>([])
   const padRef    = useRef<any>(null)
   const padOffset = useRef({ x: 0, y: 0 })
   const insets    = useSafeAreaInsets()
 
   const atual = colaboradores[idx]
+  const jaAssinou = !!(atual?.id && jaAssinaramIds.has(atual.id))
 
   useEffect(() => { nav.setOptions({ title: `Assinatura ${idx + 1} / ${total}` }) }, [idx, total])
+
+  // Carrega quem já assinou nesta sessão
+  useEffect(() => {
+    if (!registroId) { setLoadingCheck(false); return }
+    supabase
+      .from('dds_assinaturas')
+      .select('colaborador_id')
+      .eq('registro_id', registroId)
+      .not('colaborador_id', 'is', null)
+      .then(({ data }) => {
+        setJaAssinaramIds(new Set((data || []).map((a: any) => a.colaborador_id)))
+        setLoadingCheck(false)
+      })
+  }, [registroId])
 
   // Permite landscape nesta tela, volta para portrait ao sair
   useFocusEffect(useCallback(() => {
@@ -129,7 +146,34 @@ export default function DDSAssinaturasScreen() {
     currentStroke.current = []
   }
 
+  async function finalizarRegistro() {
+    const { count } = await supabase
+      .from('dds_assinaturas')
+      .select('*', { count: 'exact', head: true })
+      .eq('registro_id', registroId)
+    await supabase
+      .from('dds_registros')
+      .update({ status: 'concluido', total_assinantes: count || 0, concluido_em: new Date().toISOString() })
+      .eq('id', registroId)
+    router.replace({
+      pathname: '/dds/concluido',
+      params: { registroId, temaTitulo, totalAssinantes: String(count || 0), colaboradores: colabsParam },
+    })
+  }
+
+  async function pular() {
+    if (idx + 1 >= total) {
+      setSaving(true)
+      try { await finalizarRegistro() } finally { setSaving(false) }
+    } else {
+      setIdx(i => i + 1)
+      setStrokes([])
+      currentStroke.current = []
+    }
+  }
+
   async function salvarEAvancar() {
+    if (jaAssinou) { await pular(); return }
     if (strokes.length === 0 || strokes.every(s => s.length === 0)) {
       Alert.alert('Assinatura vazia', 'Por favor, assine antes de continuar.'); return
     }
@@ -143,16 +187,8 @@ export default function DDSAssinaturasScreen() {
         assinatura_svg:  svg,
         assinado_em:     new Date().toISOString(),
       })
-
       if (idx + 1 >= total) {
-        // Último — conclui o registro
-        await supabase.from('dds_registros')
-          .update({ status: 'concluido', total_assinantes: total, concluido_em: new Date().toISOString() })
-          .eq('id', registroId)
-        router.replace({
-          pathname: '/dds/concluido',
-          params: { registroId, temaTitulo, totalAssinantes: String(total), colaboradores: colabsParam },
-        })
+        await finalizarRegistro()
       } else {
         setIdx(i => i + 1)
         setStrokes([])
@@ -185,27 +221,39 @@ export default function DDSAssinaturasScreen() {
         {/* Contador e nome */}
         <Text style={s.contador}>{idx + 1} / {total}</Text>
         <Text style={s.nome}>{atual?.nome}</Text>
-        <Text style={s.instrucao}>Assine no campo abaixo</Text>
 
-        {/* Pad de assinatura */}
-        <View style={[s.padWrap, { width: padW }]}>
-          <View
-            ref={padRef}
-            style={[s.pad, { width: padW, height: padH }]}
-            onLayout={medirPad}
-            {...panResponder.panHandlers}>
-            <DrawingCanvas strokes={strokes} padW={padW} padH={padH} />
-            {strokes.length === 0 && (
-              <Text style={s.padPlaceholder}>← assine aqui →</Text>
-            )}
-            {/* linha guia */}
-            <View style={s.linha} />
+        {loadingCheck ? (
+          <ActivityIndicator size="large" color={C.primary} style={{ marginTop: 40 }} />
+        ) : jaAssinou ? (
+          <View style={s.jaAssinouBox}>
+            <Ionicons name="checkmark-circle" size={64} color="#10b981" />
+            <Text style={s.jaAssinouText}>Já assinou</Text>
+            <Text style={s.jaAssinouSub}>Esta pessoa já tem assinatura registrada nesta sessão.</Text>
           </View>
-          <TouchableOpacity style={s.btnLimpar} onPress={limpar}>
-            <Ionicons name="trash-outline" size={16} color={C.textSub} />
-            <Text style={s.btnLimparText}>Limpar</Text>
-          </TouchableOpacity>
-        </View>
+        ) : (
+          <>
+            <Text style={s.instrucao}>Assine no campo abaixo</Text>
+            {/* Pad de assinatura */}
+            <View style={[s.padWrap, { width: padW }]}>
+              <View
+                ref={padRef}
+                style={[s.pad, { width: padW, height: padH }]}
+                onLayout={medirPad}
+                {...panResponder.panHandlers}>
+                <DrawingCanvas strokes={strokes} padW={padW} padH={padH} />
+                {strokes.length === 0 && (
+                  <Text style={s.padPlaceholder}>← assine aqui →</Text>
+                )}
+                {/* linha guia */}
+                <View style={s.linha} />
+              </View>
+              <TouchableOpacity style={s.btnLimpar} onPress={limpar}>
+                <Ionicons name="trash-outline" size={16} color={C.textSub} />
+                <Text style={s.btnLimparText}>Limpar</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
       </View>
 
       {/* Navegação inferior */}
@@ -215,14 +263,18 @@ export default function DDSAssinaturasScreen() {
           <Text style={s.btnVoltarText}>{idx === 0 ? 'Voltar' : 'Anterior'}</Text>
         </TouchableOpacity>
 
+        {!jaAssinou && (
+          <TouchableOpacity style={[s.btnPular, saving && { opacity: 0.5 }]} onPress={pular} disabled={saving}>
+            <Text style={s.btnPularText}>Pular</Text>
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity style={[s.btnProximo, saving && { opacity: 0.5 }]} onPress={salvarEAvancar} disabled={saving}>
           {saving
             ? <ActivityIndicator size="small" color="#fff" />
-            : <>
-                <Text style={s.btnProximoText}>
-                  {idx + 1 === total ? '✅ Finalizar' : 'Próximo →'}
-                </Text>
-              </>
+            : <Text style={s.btnProximoText}>
+                {idx + 1 === total ? '✅ Finalizar' : jaAssinou ? 'Próximo →' : 'Assinar →'}
+              </Text>
           }
         </TouchableOpacity>
       </View>
@@ -249,9 +301,14 @@ const s = StyleSheet.create({
   linha:           { position: 'absolute', bottom: 40, left: 20, right: 20, height: 1, backgroundColor: C.border },
   btnLimpar:       { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8, paddingVertical: 4, paddingHorizontal: 8 },
   btnLimparText:   { fontSize: 13, color: C.textSub },
-  footer:          { flexDirection: 'row', gap: 12, padding: 16, paddingBottom: 16, borderTopWidth: 1, borderTopColor: C.border, backgroundColor: C.bgCard },
+  jaAssinouBox:    { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 20, marginTop: 20 },
+  jaAssinouText:   { fontSize: 22, fontWeight: '900', color: '#10b981', textAlign: 'center' },
+  jaAssinouSub:    { fontSize: 14, color: C.textMuted, textAlign: 'center', lineHeight: 22 },
+  footer:          { flexDirection: 'row', gap: 10, padding: 16, paddingBottom: 16, borderTopWidth: 1, borderTopColor: C.border, backgroundColor: C.bgCard },
   btnVoltar:       { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 12, borderWidth: 1.5, borderColor: C.border, padding: 14 },
   btnVoltarText:   { fontSize: 15, fontWeight: '700', color: C.text },
+  btnPular:        { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1.5, borderColor: '#f59e0b', padding: 14 },
+  btnPularText:    { fontSize: 14, fontWeight: '700', color: '#f59e0b' },
   btnProximo:      { flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: C.navy, borderRadius: 12, padding: 14 },
   btnProximoText:  { fontSize: 15, fontWeight: '800', color: '#fff' },
 })
