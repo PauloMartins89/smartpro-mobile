@@ -117,6 +117,12 @@ export default function MapaViewerScreen() {
   const panSavedY   = useSharedValue(0)
   const savedScale  = useSharedValue(1)
   const savedRot    = useSharedValue(0)
+  const pinchSavedTx = useSharedValue(0)
+  const pinchSavedTy = useSharedValue(0)
+  const pinchFx0     = useSharedValue(0)
+  const pinchFy0     = useSharedValue(0)
+  const imgW         = useSharedValue(0)
+  const imgH         = useSharedValue(0)
   const [gps,      setGps]      = useState(null)     // { latitude, longitude, accuracy }
   const [gpsErr,   setGpsErr]   = useState(null)
   const [tracking, setTracking] = useState(false)
@@ -179,6 +185,8 @@ export default function MapaViewerScreen() {
         const initTy = SCREEN_H / 2 - ih / 2
         imgSizeRef.current = { w: iw, h: ih }
         setImgSize({ w: iw, h: ih })
+        imgW.value        = iw
+        imgH.value        = ih
         scaleVal.value    = initScale
         savedScale.value  = initScale
         translateX.value  = initTx
@@ -440,6 +448,7 @@ export default function MapaViewerScreen() {
 
   // ── Gestures (Pan + Pinch + Rotation simultâneos) ────────────────────────
   const panGesture = Gesture.Pan()
+    .maxPointers(1)
     .onStart(() => {
       panSavedX.value = translateX.value
       panSavedY.value = translateY.value
@@ -450,9 +459,26 @@ export default function MapaViewerScreen() {
     })
 
   const pinchGesture = Gesture.Pinch()
-    .onStart(() => { savedScale.value = scaleVal.value })
+    .onStart(e => {
+      savedScale.value   = scaleVal.value
+      pinchSavedTx.value = translateX.value
+      pinchSavedTy.value = translateY.value
+      pinchFx0.value     = e.focalX
+      pinchFy0.value     = e.focalY
+    })
     .onUpdate(e => {
-      scaleVal.value = Math.min(8, Math.max(0.3, savedScale.value * e.scale))
+      const s0    = savedScale.value
+      const s_new = Math.min(8, Math.max(0.3, s0 * e.scale))
+      const ratio = s_new / s0
+      const hw    = imgW.value / 2
+      const hh    = imgH.value / 2
+      scaleVal.value   = s_new
+      translateX.value = e.focalX - hw - (pinchFx0.value - hw - pinchSavedTx.value) * ratio
+      translateY.value = e.focalY - hh - (pinchFy0.value - hh - pinchSavedTy.value) * ratio
+    })
+    .onEnd(() => {
+      panSavedX.value = translateX.value
+      panSavedY.value = translateY.value
     })
 
   const rotationGesture = Gesture.Rotation()
