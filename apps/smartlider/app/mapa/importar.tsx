@@ -6,8 +6,7 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter, useNavigation } from 'expo-router'
-import * as DocumentPicker from 'expo-document-picker'
-import * as FileSystem from 'expo-file-system/legacy'
+import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../../src/lib/supabase'
 import useLiderStore from '../../src/store/useLiderStore'
 import { C } from '../../src/lib/theme'
@@ -21,18 +20,32 @@ export default function ImportarMapaScreen() {
   const [uploading, setUploading] = useState(false)
   const [progress,  setProgress]  = useState(0)
 
-  // Abre o seletor de arquivos do Android
+  // Abre a galeria de imagens do Android
   async function selecionarArquivo() {
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: '*/*',
-        copyToCacheDirectory: true,
-        multiple: false,
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
+      if (status !== 'granted') {
+        Alert.alert('Permissão negada', 'Precisamos de acesso à galeria para importar mapas.')
+        return
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 1,
+        base64: true,
       })
       if (result.canceled || !result.assets?.length) return
-      setArquivo(result.assets[0])
+      const asset = result.assets[0]
+      // Monta objeto compatível com o restante do código
+      setArquivo({
+        uri:      asset.uri,
+        name:     asset.fileName ?? ('mapa_' + Date.now() + '.jpg'),
+        mimeType: asset.mimeType ?? 'image/jpeg',
+        size:     asset.fileSize ?? null,
+        _base64:  asset.base64,
+      })
     } catch (e) {
-      Alert.alert('Erro ao acessar arquivos', e?.message ?? String(e))
+      Alert.alert('Erro ao acessar galeria', e?.message ?? String(e))
     }
   }
 
@@ -42,10 +55,8 @@ export default function ImportarMapaScreen() {
     setUploading(true)
     setProgress(0.1)
     try {
-      // 1. Le como base64
-      const base64 = await FileSystem.readAsStringAsync(arquivo.uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      })
+      // 1. Usa base64 retornado pelo ImagePicker
+      const base64 = arquivo._base64
       setProgress(0.3)
 
       // 2. Converte para Uint8Array
@@ -121,10 +132,10 @@ export default function ImportarMapaScreen() {
         ) : (
           <>
             <Text style={st.pickerTitle}>Selecionar mapa</Text>
-            <Text style={st.pickerSub}>PDF, PNG, JPG e outros formatos</Text>
+            <Text style={st.pickerSub}>PNG, JPG — imagens de mapa</Text>
             <View style={st.pickerCta}>
-              <Ionicons name="folder-open-outline" size={15} color={C.primary} />
-              <Text style={st.pickerCtaTxt}>Acessar arquivos</Text>
+              <Ionicons name="images-outline" size={15} color={C.primary} />
+              <Text style={st.pickerCtaTxt}>Abrir galeria</Text>
             </View>
           </>
         )}
