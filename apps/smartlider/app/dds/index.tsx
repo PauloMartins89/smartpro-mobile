@@ -33,23 +33,25 @@ export default function DDSIndexScreen() {
   const [loading,  setLoading]  = useState(true)
   const [selected, setSelected] = useState(null)
   const [lido,     setLido]     = useState(false)
-  const [jaFeito,  setJaFeito]  = useState(null) // registro já concluído hoje
+  const [jaFeitos, setJaFeitos] = useState<any[]>([]) // todos os DDS concluídos hoje
 
   useEffect(() => { nav.setOptions({ title: 'DDS — Diálogo de Segurança' }) }, [])
 
   const carregar = useCallback(async () => {
     if (!workspaceId) return
     setLoading(true)
+    const hoje = new Date().toISOString().slice(0, 10)
     const [{ data: temasData }, { data: regHoje }] = await Promise.all([
       supabase.from('dds_temas').select('*').eq('workspace_id', workspaceId).eq('ativo', true).order('categoria').order('titulo'),
       turnoAtivo ? supabase.from('dds_registros')
-        .select('*, dds_temas(titulo, categoria)')
+        .select('id, tema_id, total_assinantes, dds_temas(titulo, categoria)')
         .eq('turno_id', turnoAtivo.id)
+        .eq('data', hoje)
         .eq('status', 'concluido')
-        .maybeSingle() : Promise.resolve({ data: null }),
+        .order('created_at') : Promise.resolve({ data: [] }),
     ])
     setTemas(temasData ?? [])
-    setJaFeito(regHoje ?? null)
+    setJaFeitos(regHoje ?? [])
     setLoading(false)
   }, [workspaceId, turnoAtivo?.id])
 
@@ -69,14 +71,23 @@ export default function DDSIndexScreen() {
   return (
     <ScrollView style={s.container} contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}>
 
-      {/* Aviso: DDS já feito hoje */}
-      {jaFeito && (
+      {/* DDS já realizados hoje */}
+      {jaFeitos.length > 0 && (
         <View style={s.bannerOk}>
           <Ionicons name="checkmark-circle" size={20} color={C.green} />
-          <Text style={s.bannerOkText}>
-            DDS concluído hoje: <Text style={{ fontWeight: '800' }}>{jaFeito.dds_temas?.titulo}</Text>
-            {' — '}{jaFeito.total_assinantes} assinatura(s)
-          </Text>
+          <View style={{ flex: 1 }}>
+            <Text style={s.bannerOkText}>
+              {jaFeitos.length} DDS concluído{jaFeitos.length > 1 ? 's' : ''} hoje:
+            </Text>
+            {jaFeitos.map((r, i) => (
+              <Text key={r.id} style={[s.bannerOkText, { fontSize: 12, opacity: 0.85 }]}>
+                {i + 1}. {r.dds_temas?.titulo} — {r.total_assinantes} assinatura(s)
+              </Text>
+            ))}
+            <Text style={[s.bannerOkText, { fontSize: 12, marginTop: 4, opacity: 0.7 }]}>
+              Pode realizar outro DDS com tema diferente.
+            </Text>
+          </View>
         </View>
       )}
 
