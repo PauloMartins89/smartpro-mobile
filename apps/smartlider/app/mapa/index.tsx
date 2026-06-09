@@ -36,7 +36,19 @@ export default function MapaListScreen() {
   const [dlProgress, setDlProgress] = useState({})   // { [id]: 0â€“1 }
   const dlRef = useRef({})
 
-  useEffect(() => { nav.setOptions({ title: 'Mapas' }) }, [])
+  useEffect(() => {
+    nav.setOptions({
+      title: 'Mapas',
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => router.push('/mapa/importar')}
+          style={{ paddingHorizontal: 8, paddingVertical: 4 }}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Ionicons name="add" size={28} color="#fff" />
+        </TouchableOpacity>
+      ),
+    })
+  }, [])
 
   const carregar = useCallback(async (isRefresh = false) => {
     if (!workspaceId) return
@@ -135,8 +147,9 @@ export default function MapaListScreen() {
           <Ionicons name="map-outline" size={48} color={C.textMuted} />
           <Text style={st.emptyTitle}>Nenhum mapa disponÃ­vel</Text>
           <Text style={st.emptySub}>
-            Importe mapas GeoPDF pelo script{'\n'}
-            scripts/geopdf_to_supabase.py
+            Toque no{' '}
+            <Text style={{ color: C.primary, fontWeight: '700' }}>+</Text>
+            {' '}no canto superior para adicionar um mapa.
           </Text>
         </View>
       ) : (
