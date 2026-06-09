@@ -96,6 +96,7 @@ export default function DDSPresencaScreen() {
             workspace_id: workspaceId,
             turno_id:     turnoAtivo.id,
             turno:        turnoAtivo.turno ?? null,
+            grupo_id:     turnoAtivo.equipe_id ?? null,
             lider_id:     liderId ?? null,
             lider_nome:   turnoAtivo.lider_nome ?? null,
             equipe_nome:  turnoAtivo.equipe_nome ?? null,
