@@ -5,7 +5,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  ActivityIndicator,
+  TextInput, ActivityIndicator,
 } from 'react-native'
 import { useNavigation, useRouter, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -28,6 +28,8 @@ export default function DDSPresencaScreen() {
   const [selecionados,  setSel]       = useState<Set<string>>(new Set())
   const [loading,       setLoading]   = useState(true)
   const [saving,        setSaving]    = useState(false)
+  const [convidados,    setConvidados]   = useState<{ nome: string }[]>([])
+  const [novoConvidado, setNovoConvidado] = useState('')
 
   useEffect(() => { nav.setOptions({ title: 'Quem estava presente?' }) }, [])
 
@@ -50,6 +52,17 @@ export default function DDSPresencaScreen() {
   }, [turnoAtivo?.id])
 
   useEffect(() => { carregar() }, [carregar])
+
+  function adicionarConvidado() {
+    const nome = novoConvidado.trim()
+    if (!nome) return
+    setConvidados(prev => [...prev, { nome }])
+    setNovoConvidado('')
+  }
+
+  function removerConvidado(i: number) {
+    setConvidados(prev => prev.filter((_, idx) => idx !== i))
+  }
 
   function toggleColab(id: string) {
     setSel(prev => {
@@ -98,12 +111,16 @@ export default function DDSPresencaScreen() {
 
       // Monta lista dos presentes
       const presentes = colaboradores.filter(c => selecionados.has(c.id))
+      const todos = [
+        ...presentes.map(c => ({ id: c.id, nome: c.nome })),
+        ...convidados.map(c => ({ id: null, nome: c.nome })),
+      ]
       router.push({
         pathname: '/dds/assinaturas',
         params: {
           registroId,
           temaTitulo,
-          colaboradores: JSON.stringify(presentes.map(c => ({ id: c.id, nome: c.nome }))),
+          colaboradores: JSON.stringify(todos),
         },
       })
     } catch (e) {
@@ -170,16 +187,44 @@ export default function DDSPresencaScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Convidados */}
+      <View style={s.convidadosBox}>
+        <Text style={s.sectionLabel}>Convidados / Visitantes</Text>
+        <View style={s.addRow}>
+          <TextInput
+            style={s.input}
+            placeholder="Nome do convidado"
+            placeholderTextColor={C.textMuted}
+            value={novoConvidado}
+            onChangeText={setNovoConvidado}
+            onSubmitEditing={adicionarConvidado}
+            returnKeyType="done"
+          />
+          <TouchableOpacity onPress={adicionarConvidado} style={s.addBtn}>
+            <Ionicons name="add" size={22} color="#fff" />
+          </TouchableOpacity>
+        </View>
+        {convidados.map((c, i) => (
+          <View key={i} style={s.convidadoRow}>
+            <Ionicons name="person-add-outline" size={16} color={C.primary} />
+            <Text style={s.convidadoNome}>{c.nome}</Text>
+            <TouchableOpacity onPress={() => removerConvidado(i)}>
+              <Ionicons name="close-circle-outline" size={20} color={C.textMuted} />
+            </TouchableOpacity>
+          </View>
+        ))}
+      </View>
+
       <TouchableOpacity
-        style={[s.btnContinuar, (qtdSel === 0 || saving) && { opacity: 0.4 }]}
+        style={[s.btnContinuar, ((qtdSel === 0 && convidados.length === 0) || saving) && { opacity: 0.4 }]}
         onPress={continuar}
-        disabled={qtdSel === 0 || saving}
+        disabled={(qtdSel === 0 && convidados.length === 0) || saving}
         activeOpacity={0.8}>
         {saving
           ? <ActivityIndicator size="small" color="#fff" />
           : <>
               <Ionicons name="create-outline" size={20} color="#fff" />
-              <Text style={s.btnText}>Ir para Assinaturas ({qtdSel}) →</Text>
+              <Text style={s.btnText}>Ir para Assinaturas ({qtdSel + convidados.length}) →</Text>
             </>
         }
       </TouchableOpacity>
@@ -207,4 +252,10 @@ const s = StyleSheet.create({
   emptyText:     { fontSize: 13, color: C.textMuted, textAlign: 'center', lineHeight: 20 },
   btnContinuar:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: C.navy, borderRadius: 14, padding: 16, marginTop: 4 },
   btnText:       { fontSize: 16, fontWeight: '800', color: '#fff' },
+  convidadosBox: { backgroundColor: C.bgCard, borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: C.border, marginTop: 8 },
+  addRow:        { flexDirection: 'row', gap: 10, alignItems: 'center', marginBottom: 8 },
+  input:         { flex: 1, backgroundColor: C.bg, borderRadius: 8, borderWidth: 1, borderColor: C.border, padding: 10, fontSize: 14, color: C.text },
+  addBtn:        { backgroundColor: C.primary, borderRadius: 8, width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  convidadoRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, borderTopWidth: 1, borderTopColor: C.border },
+  convidadoNome: { flex: 1, fontSize: 14, fontWeight: '600', color: C.text },
 })

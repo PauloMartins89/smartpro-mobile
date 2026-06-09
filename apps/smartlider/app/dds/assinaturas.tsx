@@ -138,7 +138,7 @@ export default function DDSAssinaturasScreen() {
       const svg = strokesToSvg(strokes, padW, padH)
       await supabase.from('dds_assinaturas').insert({
         registro_id:     registroId,
-        colaborador_id:  atual.id,
+        colaborador_id:  atual.id || null,
         colaborador_nome: atual.nome,
         assinatura_svg:  svg,
         assinado_em:     new Date().toISOString(),
