@@ -458,6 +458,11 @@ export default function MapaViewerScreen() {
     ],
   }))
 
+  // Counter-scale para o dot GPS — mantém tamanho fixo independente do zoom
+  const dotCounterScaleStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: 1 / scaleVal.value }],
+  }))
+
   // ── Zoom helpers ──────────────────────────────────────────────────────────
   const zoomIn  = () => {
     scaleVal.value = withTiming(Math.min(8, scaleVal.value + 0.5), { duration: 200 })
@@ -514,8 +519,8 @@ export default function MapaViewerScreen() {
       )}
 
       {/* Mapa com GPS overlay — gestures fluidos (Pan + Pinch + Rotation) */}
-      <View style={st.scroll} collapsable={false}>
       <GestureDetector gesture={composed}>
+      <View style={st.scroll} collapsable={false}>
         <Animated.View style={[{ width: imgSize.w, height: imgSize.h, position: 'absolute' }, mapAnimStyle]}>
             {/* Imagem do mapa (local cache ou URL) */}
             <Image
@@ -587,7 +592,7 @@ export default function MapaViewerScreen() {
             {/* Dot GPS */}
             {dotX !== null && dotY !== null && (
               <View style={[st.dotWrap, { left: dotX - 14, top: dotY - 14 }]}>
-                {/* Círculo de precisão */}
+                {/* Círculo de precisão — escala com o mapa (representa área real) */}
                 {accuracyRadius > 6 && (
                   <View style={[st.accuracy, {
                     width: accuracyRadius * 2,
@@ -597,10 +602,12 @@ export default function MapaViewerScreen() {
                     marginTop: -(accuracyRadius - 14),
                   }]} />
                 )}
-                {/* Ponto central */}
-                <View style={st.dotOuter}>
-                  <View style={st.dotInner} />
-                </View>
+                {/* Ponto central — tamanho FIXO, contra-escala o zoom */}
+                <Animated.View style={dotCounterScaleStyle}>
+                  <View style={st.dotOuter}>
+                    <View style={st.dotInner} />
+                  </View>
+                </Animated.View>
               </View>
             )}
 
@@ -649,8 +656,8 @@ export default function MapaViewerScreen() {
               )
             })}
         </Animated.View>
-      </GestureDetector>
       </View>
+      </GestureDetector>
 
       {/* ── Rosa dos ventos ─────────────────────────────────────────────────── */}
       {tracking && (
