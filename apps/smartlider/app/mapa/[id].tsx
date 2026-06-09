@@ -107,7 +107,7 @@ export default function MapaViewerScreen() {
 
   const [mapa,     setMapa]     = useState(null)
   const [loading,  setLoading]  = useState(true)
-  const [imgSize,  setImgSize]  = useState({ w: SCREEN_W, h: SCREEN_W })
+  const [imgSize,  setImgSize]  = useState<{ w: number, h: number } | null>(null)
   // ── Reanimated transform ──────────────────────────────────────────────────
   const translateX  = useSharedValue(0)
   const translateY  = useSharedValue(0)
@@ -132,7 +132,7 @@ export default function MapaViewerScreen() {
   const trajetoRef  = useRef([])
   const modoRef     = useRef('linha')
   const firstFixRef  = useRef(true)   // reseta ao parar GPS; dispara auto-zoom 1x por sessão
-  const imgSizeRef   = useRef({ w: SCREEN_W, h: SCREEN_W }) // ref para evitar closure stale
+  const imgSizeRef   = useRef<{ w: number, h: number } | null>(null) // ref para evitar closure stale
 
   // ── UI modals ────────────────────────────────────────────────────
   const [menuOpen,    setMenuOpen]    = useState(false)
@@ -168,9 +168,10 @@ export default function MapaViewerScreen() {
       setMapa(data)
       nav.setOptions({ title: data.nome })
 
-      // Usa dimensões REAIS da imagem — garante decodificação em full-res
-      // O scaleVal inicial é ajustado para caber na tela, imagem centralizada
-      Image.getSize(data.imagem_url, (iw, ih) => {
+      // Usa dimensões REAIS da imagem — a Image só é renderizada DEPOIS que as
+      // dimensões reais chegam aqui, evitando que o Fresco (Android) decodifique
+      // em baixa resolução no primeiro render (SCREEN_W × SCREEN_W)
+      Image.getSize(data.imagem_url, async (iw, ih) => {
         const initScale = SCREEN_W / iw
         // Centro da imagem fica no centro da tela:
         //   visual_center = element_center + translate  →  translate = screen_center - element_center
@@ -184,11 +185,11 @@ export default function MapaViewerScreen() {
         translateY.value  = initTy
         panSavedX.value   = initTx
         panSavedY.value   = initTy
+        // Verifica cache local e libera o render somente agora
+        const info = await FileSystem.getInfoAsync(localPath(id))
+        if (info.exists) setLocalUri(localPath(id))
+        setLoading(false)
       })
-      // Verifica cache local
-      const info = await FileSystem.getInfoAsync(localPath(id))
-      if (info.exists) setLocalUri(localPath(id))
-      setLoading(false)
     }
     load()
   }, [id])
@@ -484,7 +485,7 @@ export default function MapaViewerScreen() {
 
   // Centraliza o mapa na posição GPS atual com zoom de navegação
   const centrarNoGps = useCallback(() => {
-    if (!gps || !mapa) return
+    if (!gps || !mapa || !imgSize) return
     const frac = gpsToFrac(gps.latitude, gps.longitude, mapa.sw_lat, mapa.sw_lng, mapa.ne_lat, mapa.ne_lng)
     const iW = imgSize.w
     const iH = imgSize.h
@@ -497,7 +498,8 @@ export default function MapaViewerScreen() {
   }, [gps, mapa, imgSize])
 
   // ── Loading ───────────────────────────────────────────────────────────────
-  if (loading || !mapa) return (
+  // imgSize é definido dentro do callback Image.getSize, antes de setLoading(false)
+  if (loading || !mapa || !imgSize) return (
     <View style={st.center}>
       <ActivityIndicator size="large" color={C.primary} />
     </View>
