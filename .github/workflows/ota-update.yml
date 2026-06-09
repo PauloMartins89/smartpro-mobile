@@ -38,7 +38,7 @@ jobs:
         run: |
           MSG="${{ github.event.head_commit.message }}"
           if [ -z "$MSG" ]; then MSG="OTA update auto"; fi
-          npx eas-cli update --branch preview --message "$MSG" --non-interactive
+          npx eas-cli update --branch preview --environment preview --message "$MSG" --non-interactive
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           EXPO_PUBLIC_SUPABASE_URL: "https://yfxkgwlxoszbapvgtpee.supabase.co"
