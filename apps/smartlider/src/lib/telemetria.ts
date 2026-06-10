@@ -15,14 +15,15 @@
 import * as Location from 'expo-location'
 import * as TaskManager from 'expo-task-manager'
 import { Accelerometer } from 'expo-sensors'
-import NetInfo from '@react-native-community/netinfo'
-import { MMKV } from 'react-native-mmkv'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { isClearlyOffline } from './network'
 import { supabase } from './supabase'
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
 
-const TASK_NAME    = 'TELEMETRIA_GPS'
-const MMKV_STORAGE = new MMKV({ id: 'telemetria' })
+const TASK_NAME       = 'TELEMETRIA_GPS'
+const STORAGE_BUFFER  = 'telemetria_buffer'
+const STORAGE_SESSAO  = 'telemetria_sessao_pendente'
 
 // Thresholds de adaptive sampling
 const INTERVALO_PARADO_MS  = 60_000   // < 2 km/h  → 1 ponto/min
@@ -40,7 +41,7 @@ let ultimoTs:      number        = 0
 let accelZ:        number[]      = []   // janela de 1s para RMS
 let accelSub:      ReturnType<typeof Accelerometer.addListener> | null = null
 
-// ─── MMKV helpers ────────────────────────────────────────────────────────────
+// ─── AsyncStorage helpers ────────────────────────────────────────────────────
 
 type PontoBuffer = {
   sessao_id:   string
@@ -56,38 +57,38 @@ type PontoBuffer = {
   accel_rms:   number | null
 }
 
-function bufferLer(): PontoBuffer[] {
+async function bufferLer(): Promise<PontoBuffer[]> {
   try {
-    return JSON.parse(MMKV_STORAGE.getString('buffer') ?? '[]')
+    const raw = await AsyncStorage.getItem(STORAGE_BUFFER)
+    return raw ? JSON.parse(raw) : []
   } catch { return [] }
 }
 
-function bufferSalvar(pontos: PontoBuffer[]) {
-  MMKV_STORAGE.set('buffer', JSON.stringify(pontos))
+async function bufferSalvar(pontos: PontoBuffer[]) {
+  await AsyncStorage.setItem(STORAGE_BUFFER, JSON.stringify(pontos))
 }
 
-function bufferAdicionar(ponto: PontoBuffer) {
-  const buf = bufferLer()
+async function bufferAdicionar(ponto: PontoBuffer) {
+  const buf = await bufferLer()
   buf.push(ponto)
-  bufferSalvar(buf)
+  await bufferSalvar(buf)
   if (buf.length >= FLUSH_A_CADA_PONTOS) flushBuffer()
 }
 
 // ─── Flush para Supabase ─────────────────────────────────────────────────────
 
 async function flushBuffer() {
-  const buf = bufferLer()
+  const buf = await bufferLer()
   if (buf.length === 0) return
 
-  const net = await NetInfo.fetch()
-  if (!net.isConnected) return
+  if (await isClearlyOffline()) return
 
   const { error } = await supabase
     .from('lider_telemetria_pontos')
     .insert(buf)
 
   if (!error) {
-    bufferSalvar([])
+    await bufferSalvar([])
   }
 }
 
@@ -129,14 +130,13 @@ function intervaloParaVelocidade(speedMs: number | null): number {
 function gravarPonto(loc: Location.LocationObject) {
   if (!sessaoId || !workspaceId || !userId) return
 
-  const agora  = Date.now()
-  const speed  = loc.coords.speed ?? null
+  const agora   = Date.now()
+  const speed   = loc.coords.speed ?? null
   const heading = loc.coords.heading ?? null
 
-  // Adaptive sampling: pula se intervalo mínimo não passou
-  const intervalo = intervaloParaVelocidade(speed)
+  const intervalo    = intervaloParaVelocidade(speed)
   const deltaHeading = heading != null ? Math.abs(heading - ultimoHeading) : 0
-  const curva = deltaHeading > 15
+  const curva        = deltaHeading > 15
 
   if (!curva && agora - ultimoTs < intervalo) return
 
@@ -144,23 +144,23 @@ function gravarPonto(loc: Location.LocationObject) {
   if (heading != null) ultimoHeading = heading
 
   const rms = calcularRms([...accelZ])
-  accelZ = []  // limpa janela após usar
+  accelZ = []
 
   const ponto: PontoBuffer = {
-    sessao_id:   sessaoId,
+    sessao_id:    sessaoId,
     workspace_id: workspaceId,
-    user_id:     userId,
-    ts:          new Date(loc.timestamp).toISOString(),
-    lat:         loc.coords.latitude,
-    lng:         loc.coords.longitude,
-    accuracy_m:  loc.coords.accuracy ?? null,
-    speed_ms:    speed,
-    heading:     heading,
-    altitude_m:  loc.coords.altitude ?? null,
-    accel_rms:   rms,
+    user_id:      userId,
+    ts:           new Date(loc.timestamp).toISOString(),
+    lat:          loc.coords.latitude,
+    lng:          loc.coords.longitude,
+    accuracy_m:   loc.coords.accuracy ?? null,
+    speed_ms:     speed,
+    heading:      heading,
+    altitude_m:   loc.coords.altitude ?? null,
+    accel_rms:    rms,
   }
 
-  bufferAdicionar(ponto)
+  bufferAdicionar(ponto)  // async, fire-and-forget no background task
 }
 
 // ─── Background Task ─────────────────────────────────────────────────────────
@@ -191,7 +191,7 @@ export async function iniciarTelemetria(params: {
   await Location.requestBackgroundPermissionsAsync()
 
   // Cria sessão no banco (ou tenta enviar pendente do MMKV)
-  const sessaoPendente = MMKV_STORAGE.getString('sessao_pendente')
+  const sessaoPendente = await AsyncStorage.getItem(STORAGE_SESSAO)
   if (sessaoPendente) {
     sessaoId = sessaoPendente
   } else {
@@ -203,7 +203,7 @@ export async function iniciarTelemetria(params: {
 
     if (error || !data) return
     sessaoId = data.id
-    MMKV_STORAGE.set('sessao_pendente', sessaoId)
+    await AsyncStorage.setItem(STORAGE_SESSAO, sessaoId)
   }
 
   iniciarAcelerometro()
@@ -236,15 +236,14 @@ export async function finalizarTelemetria() {
   // Flush final dos pontos pendentes
   await flushBuffer()
 
-  // Fecha sessão com métricas resumidas
-  const buf = bufferLer()  // pontos que não foram para o banco ainda
+  // Fecha sessão
   await supabase
     .from('lider_telemetria_sessoes')
     .update({ finalizado_em: new Date().toISOString() })
     .eq('id', sessaoId)
 
   // Limpa estado local
-  MMKV_STORAGE.delete('sessao_pendente')
+  await AsyncStorage.removeItem(STORAGE_SESSAO)
   sessaoId    = null
   workspaceId = null
   userId      = null
