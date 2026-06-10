@@ -233,9 +233,9 @@ export default function MapaViewerScreen() {
         // Rejeita localizações por antena celular (accuracy > 300m)
         if (accuracy > 300) return
         setGps({ latitude, longitude, accuracy })
-        if (mapa) setFora(!dentroDoMapa(latitude, longitude, mapa))
+        if (mapa) setFora(mapa.sw_lat != null ? !dentroDoMapa(latitude, longitude, mapa) : false)
         // Auto-zoom na primeira posição GPS da sessão
-        if (firstFixRef.current && mapa && dentroDoMapa(latitude, longitude, mapa)) {
+        if (firstFixRef.current && mapa && mapa.sw_lat != null && dentroDoMapa(latitude, longitude, mapa)) {
           firstFixRef.current = false
           const frac = gpsToFrac(latitude, longitude, mapa.sw_lat, mapa.sw_lng, mapa.ne_lat, mapa.ne_lng)
           const iW = imgSizeRef.current.w
@@ -511,7 +511,7 @@ export default function MapaViewerScreen() {
 
   // Centraliza o mapa na posição GPS atual com zoom de navegação
   const centrarNoGps = useCallback(() => {
-    if (!gps || !mapa || !imgSize) return
+    if (!gps || !mapa || !imgSize || mapa.sw_lat == null) return
     const frac = gpsToFrac(gps.latitude, gps.longitude, mapa.sw_lat, mapa.sw_lng, mapa.ne_lat, mapa.ne_lng)
     const iW = imgSize.w
     const iH = imgSize.h
@@ -532,8 +532,10 @@ export default function MapaViewerScreen() {
   )
 
   // ── Posição do dot GPS (coordenadas naturais — escala aplicada pelo Animated.View) ──
+  const hasGpsBbox = mapa.sw_lat != null && mapa.sw_lng != null &&
+                     mapa.ne_lat != null && mapa.ne_lng != null
   let dotX = null, dotY = null
-  if (gps) {
+  if (gps && hasGpsBbox) {
     const frac = gpsToFrac(gps.latitude, gps.longitude,
                            mapa.sw_lat, mapa.sw_lng, mapa.ne_lat, mapa.ne_lng)
     dotX = frac.x * imgSize.w
@@ -542,7 +544,7 @@ export default function MapaViewerScreen() {
 
   // Raio de precisão em pixels naturais (escala aplicada pelo transform)
   let accuracyRadius = 0
-  if (gps && gps.accuracy) {
+  if (gps && gps.accuracy && hasGpsBbox) {
     const metersPerPx = ((mapa.ne_lng - mapa.sw_lng) * 111320) / imgSize.w
     accuracyRadius = gps.accuracy / metersPerPx
   }
@@ -809,8 +811,9 @@ export default function MapaViewerScreen() {
       <View style={st.legend}>
         <Text style={st.legendTxt}>
           {localUri ? '☁️ Offline  ·  ' : ''}
-          SW {mapa.sw_lat.toFixed(5)}°, {mapa.sw_lng.toFixed(5)}°{'  '}
-          NE {mapa.ne_lat.toFixed(5)}°, {mapa.ne_lng.toFixed(5)}°
+          {hasGpsBbox
+            ? `SW ${mapa.sw_lat.toFixed(5)}°, ${mapa.sw_lng.toFixed(5)}°  NE ${mapa.ne_lat.toFixed(5)}°, ${mapa.ne_lng.toFixed(5)}°`
+            : 'Sem coordenadas GPS — use o script Python para importar com GPS'}
         </Text>
       </View>
 
