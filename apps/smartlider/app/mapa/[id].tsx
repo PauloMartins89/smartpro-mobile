@@ -215,6 +215,13 @@ export default function MapaViewerScreen() {
       setGpsErr('Permissão de localização negada.')
       return
     }
+    if (mapa?.sw_lat == null || mapa?.sw_lng == null || mapa?.ne_lat == null || mapa?.ne_lng == null) {
+      Alert.alert(
+        'Mapa sem coordenadas GPS',
+        'Este mapa não tem referência geográfica — o cursor de posição não pode ser exibido.\n\nPara usar o cursor, importe o mapa via script Python (geopdf_to_supabase.py).\n\nO GPS ainda funciona e mostrará suas coordenadas no chip.',
+        [{ text: 'Entendi', style: 'default' }]
+      )
+    }
     setTracking(true)
     setGpsErr(null)
 
