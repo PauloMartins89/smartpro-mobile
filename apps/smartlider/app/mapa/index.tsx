@@ -1,7 +1,7 @@
 ﻿// @ts-nocheck
 import { useEffect, useState, useCallback, useRef } from 'react'
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  View, Text, StyleSheet, FlatList, TouchableOpacity,
   ActivityIndicator, Alert, RefreshControl,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
@@ -15,7 +15,8 @@ const TIPO_LABEL = { acesso: 'Acesso', microplanejamento: 'Microplanejamento', o
 const TIPO_COLOR = { acesso: C.primary, microplanejamento: '#e67e22', outro: C.textMuted }
 const TIPO_ICON  = { acesso: 'navigate-outline', microplanejamento: 'map-outline', outro: 'document-outline' }
 
-const LOCAL_DIR  = FileSystem.cacheDirectory + 'mapas/'
+// documentDirectory é persistente — o Android NÃO apaga durante limpeza de cache
+const LOCAL_DIR  = FileSystem.documentDirectory + 'mapas/'
 const localPath  = (id) => LOCAL_DIR + id + '.png'
 
 function fmtBytes(b) {
@@ -60,17 +61,21 @@ export default function MapaListScreen() {
       .eq('workspace_id', workspaceId)
       .eq('ativo', true)
       .order('criado_em', { ascending: false })
+      .limit(500)   // teto de segurança — acima disso paginar
 
     const lista = data ?? []
     setMapas(lista)
 
-    // Verifica quais mapas jÃ¡ estÃ£o em cache local
+    // Verifica cache local em lotes de 10 (evita 100+ chamadas I/O simultâneas)
     const status = { ...dlStatus }
-    await Promise.all(lista.map(async m => {
-      if (status[m.id] === 'downloading') return   // nÃ£o sobrescreve download ativo
-      const info = await FileSystem.getInfoAsync(localPath(m.id))
-      status[m.id] = info.exists ? 'done' : 'idle'
-    }))
+    const BATCH = 10
+    for (let i = 0; i < lista.length; i += BATCH) {
+      await Promise.all(lista.slice(i, i + BATCH).map(async m => {
+        if (status[m.id] === 'downloading') return
+        const info = await FileSystem.getInfoAsync(localPath(m.id))
+        status[m.id] = info.exists ? 'done' : 'idle'
+      }))
+    }
     setDlStatus(status)
 
     isRefresh ? setRefreshing(false) : setLoading(false)
@@ -130,36 +135,12 @@ export default function MapaListScreen() {
   }, [])
 
   // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  if (loading) return (
-    <View style={st.center}>
-      <ActivityIndicator size="large" color={C.primary} />
-    </View>
-  )
-
-  return (
-    <ScrollView
-      style={st.root}
-      contentContainerStyle={{ padding: 16 }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => carregar(true)} tintColor={C.primary} />}>
-
-      {mapas.length === 0 ? (
-        <View style={st.empty}>
-          <Ionicons name="map-outline" size={48} color={C.textMuted} />
-          <Text style={st.emptyTitle}>Nenhum mapa disponÃ­vel</Text>
-          <Text style={st.emptySub}>
-            Toque no{' '}
-            <Text style={{ color: C.primary, fontWeight: '700' }}>+</Text>
-            {' '}no canto superior para adicionar um mapa.
-          </Text>
-        </View>
-      ) : (
-        mapas.map(m => {
-          const st_dl  = dlStatus[m.id] ?? 'idle'
-          const prog   = dlProgress[m.id] ?? 0
-          const cor    = TIPO_COLOR[m.tipo] ?? C.primary
-
-          return (
-            <View key={m.id} style={st.card}>
+  const renderItem = useCallback(({ item: m }) => {
+    const st_dl = dlStatus[m.id] ?? 'idle'
+    const prog  = dlProgress[m.id] ?? 0
+    const cor   = TIPO_COLOR[m.tipo] ?? C.primary
+    return (
+      <View style={st.card}>
               {/* Ãrea clicÃ¡vel â†’ abre mapa */}
               <TouchableOpacity
                 style={st.cardTouchable}
@@ -219,10 +200,43 @@ export default function MapaListScreen() {
                 }
               </TouchableOpacity>
             </View>
-          )
-        })
-      )}
-    </ScrollView>
+    )
+  }, [dlStatus, dlProgress, baixar, removerCache, router])
+
+  const ListEmpty = useCallback(() => (
+    loading ? null : (
+      <View style={st.empty}>
+        <Ionicons name="map-outline" size={48} color={C.textMuted} />
+        <Text style={st.emptyTitle}>Nenhum mapa disponível</Text>
+        <Text style={st.emptySub}>
+          Toque no{' '}
+          <Text style={{ color: C.primary, fontWeight: '700' }}>+</Text>
+          {' '}no canto superior para adicionar um mapa.
+        </Text>
+      </View>
+    )
+  ), [loading])
+
+  if (loading) return (
+    <View style={st.center}>
+      <ActivityIndicator size="large" color={C.primary} />
+    </View>
+  )
+
+  return (
+    <FlatList
+      style={st.root}
+      contentContainerStyle={{ padding: 16, flexGrow: 1 }}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => carregar(true)} tintColor={C.primary} />}
+      data={mapas}
+      keyExtractor={m => m.id}
+      renderItem={renderItem}
+      ListEmptyComponent={ListEmpty}
+      removeClippedSubviews
+      maxToRenderPerBatch={10}
+      windowSize={5}
+      initialNumToRender={15}
+    />
   )
 }
 
