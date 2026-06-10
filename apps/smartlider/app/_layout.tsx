@@ -369,7 +369,15 @@ export default function RootLayout() {
             const isAuth = segments[0] === '(auth)'
             if (!sess && !isAuth) router.replace('/(auth)/login')
             if (sess  &&  isAuth) router.replace('/(tabs)')
-            if (sess) fetchAndSetLiderPerfil(sess.user.id, setLiderPerfil)
+            if (sess) {
+              fetchAndSetLiderPerfil(sess.user.id, setLiderPerfil).then(() => {
+                // Inicia telemetria se ainda não estiver rodando (ex: login pelo app)
+                const perfil = useLiderStore.getState().liderPerfil
+                if (perfil?.workspace_id) {
+                  iniciarTelemetria({ userId: sess.user.id, workspaceId: perfil.workspace_id }).catch(() => {})
+                }
+              })
+            }
           })
         }
         if (splashDoneRef.current) {

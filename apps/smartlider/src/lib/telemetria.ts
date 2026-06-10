@@ -81,14 +81,17 @@ async function flushBuffer() {
   const buf = await bufferLer()
   if (buf.length === 0) return
 
-  if (await isClearlyOffline()) return
+  if (await isClearlyOffline()) { console.log('[Telemetria] offline, flush adiado'); return }
 
   const { error } = await supabase
     .from('lider_telemetria_pontos')
     .insert(buf)
 
   if (!error) {
+    console.log('[Telemetria] flush OK:', buf.length, 'pontos')
     await bufferSalvar([])
+  } else {
+    console.error('[Telemetria] erro no flush:', error.message)
   }
 }
 
@@ -184,11 +187,19 @@ export async function iniciarTelemetria(params: {
   userId      = params.userId
   workspaceId = params.workspaceId
 
+  // Evita dupla inicialização
+  if (sessaoId) {
+    console.log('[Telemetria] já iniciada, sessaoId:', sessaoId)
+    return
+  }
+
   // Solicita permissão de localização
   const { status } = await Location.requestForegroundPermissionsAsync()
+  console.log('[Telemetria] permissão foreground:', status)
   if (status !== 'granted') return
 
-  await Location.requestBackgroundPermissionsAsync()
+  const bgPerm = await Location.requestBackgroundPermissionsAsync()
+  console.log('[Telemetria] permissão background:', bgPerm.status)
 
   // Cria sessão no banco (ou tenta enviar pendente do MMKV)
   const sessaoPendente = await AsyncStorage.getItem(STORAGE_SESSAO)
@@ -201,25 +212,34 @@ export async function iniciarTelemetria(params: {
       .select('id')
       .single()
 
-    if (error || !data) return
+    if (error || !data) {
+      console.error('[Telemetria] erro ao criar sessão:', error?.message)
+      return
+    }
     sessaoId = data.id
+    console.log('[Telemetria] sessão criada:', sessaoId)
     await AsyncStorage.setItem(STORAGE_SESSAO, sessaoId)
   }
 
   iniciarAcelerometro()
 
   // Inicia background location
-  await Location.startLocationUpdatesAsync(TASK_NAME, {
-    accuracy:          Location.Accuracy.BestForNavigation,
-    distanceInterval:  5,      // mínimo 5m entre pontos (evita spam parado)
-    timeInterval:      5_000,  // mínimo 5s
-    showsBackgroundLocationIndicator: false,
-    foregroundService: {
-      notificationTitle: 'SmartLíder',
-      notificationBody:  'Registrando jornada de campo',
-      notificationColor: '#1e40af',
-    },
-  })
+  try {
+    await Location.startLocationUpdatesAsync(TASK_NAME, {
+      accuracy:          Location.Accuracy.BestForNavigation,
+      distanceInterval:  5,
+      timeInterval:      5_000,
+      showsBackgroundLocationIndicator: false,
+      foregroundService: {
+        notificationTitle: 'SmartLíder',
+        notificationBody:  'Registrando jornada de campo',
+        notificationColor: '#1e40af',
+      },
+    })
+    console.log('[Telemetria] background task iniciada')
+  } catch (e: any) {
+    console.error('[Telemetria] erro ao iniciar task GPS:', e?.message)
+  }
 }
 
 /**
