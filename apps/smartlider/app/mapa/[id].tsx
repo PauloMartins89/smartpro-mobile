@@ -171,6 +171,7 @@ export default function MapaViewerScreen() {
         .eq('id', id)
         .single()
       if (!data) return
+      console.log('[mapa] bbox:', data.sw_lat, data.sw_lng, data.ne_lat, data.ne_lng)
       setMapa(data)
       nav.setOptions({ title: data.nome })
 
@@ -535,23 +536,17 @@ export default function MapaViewerScreen() {
   const hasGpsBbox = mapa.sw_lat != null && mapa.sw_lng != null &&
                      mapa.ne_lat != null && mapa.ne_lng != null
   let dotX = null, dotY = null
-  let dotClamped = false   // true quando GPS está fora do mapa OU mapa sem coords
-  if (gps) {
-    if (hasGpsBbox) {
-      const frac = gpsToFrac(gps.latitude, gps.longitude,
-                             mapa.sw_lat, mapa.sw_lng, mapa.ne_lat, mapa.ne_lng)
-      const rawX = frac.x * imgSize.w
-      const rawY = frac.y * imgSize.h
-      dotClamped = rawX < 0 || rawX > imgSize.w || rawY < 0 || rawY > imgSize.h
-      // Clampear na borda do mapa — dot fica parado no limite na mesma direção
-      dotX = Math.max(0, Math.min(imgSize.w, rawX))
-      dotY = Math.max(0, Math.min(imgSize.h, rawY))
-    } else {
-      // Mapa sem coordenadas GPS — dot laranja fixo no centro (GPS ativo, sem referência)
-      dotX = imgSize.w / 2
-      dotY = imgSize.h / 2
-      dotClamped = true
-    }
+  let dotClamped = false   // true quando GPS está fora do mapa → dot fica na borda
+  if (gps && hasGpsBbox) {
+    const frac = gpsToFrac(gps.latitude, gps.longitude,
+                           mapa.sw_lat, mapa.sw_lng, mapa.ne_lat, mapa.ne_lng)
+    const rawX = frac.x * imgSize.w
+    const rawY = frac.y * imgSize.h
+    dotClamped = rawX < 0 || rawX > imgSize.w || rawY < 0 || rawY > imgSize.h
+    // Clampear na borda do mapa — dot fica parado no limite na mesma direção
+    dotX = Math.max(0, Math.min(imgSize.w, rawX))
+    dotY = Math.max(0, Math.min(imgSize.h, rawY))
+    // mapas sem bbox (hasGpsBbox=false): sem dot — GPS só aparece no chip de coords
   }
 
   // Raio de precisão em pixels naturais — só mostra quando dentro do mapa com bbox
