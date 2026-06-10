@@ -535,16 +535,21 @@ export default function MapaViewerScreen() {
   const hasGpsBbox = mapa.sw_lat != null && mapa.sw_lng != null &&
                      mapa.ne_lat != null && mapa.ne_lng != null
   let dotX = null, dotY = null
+  let dotClamped = false   // true quando GPS está fora do mapa → dot fica na borda
   if (gps && hasGpsBbox) {
     const frac = gpsToFrac(gps.latitude, gps.longitude,
                            mapa.sw_lat, mapa.sw_lng, mapa.ne_lat, mapa.ne_lng)
-    dotX = frac.x * imgSize.w
-    dotY = frac.y * imgSize.h
+    const rawX = frac.x * imgSize.w
+    const rawY = frac.y * imgSize.h
+    dotClamped = rawX < 0 || rawX > imgSize.w || rawY < 0 || rawY > imgSize.h
+    // Clampear na borda do mapa — dot fica parado no limite na mesma direção
+    dotX = Math.max(0, Math.min(imgSize.w, rawX))
+    dotY = Math.max(0, Math.min(imgSize.h, rawY))
   }
 
-  // Raio de precisão em pixels naturais (escala aplicada pelo transform)
+  // Raio de precisão em pixels naturais — só mostra quando dentro do mapa
   let accuracyRadius = 0
-  if (gps && gps.accuracy && hasGpsBbox) {
+  if (gps && gps.accuracy && hasGpsBbox && !dotClamped) {
     const metersPerPx = ((mapa.ne_lng - mapa.sw_lng) * 111320) / imgSize.w
     accuracyRadius = gps.accuracy / metersPerPx
   }
@@ -633,8 +638,8 @@ export default function MapaViewerScreen() {
             {/* Dot GPS */}
             {dotX !== null && dotY !== null && (
               <View style={[st.dotWrap, { left: dotX - 14, top: dotY - 14 }]}>
-                {/* Círculo de precisão — escala com o mapa (representa área real) */}
-                {accuracyRadius > 6 && (
+                {/* Círculo de precisão — só quando dentro do mapa */}
+                {!dotClamped && accuracyRadius > 6 && (
                   <View style={[st.accuracy, {
                     width: accuracyRadius * 2,
                     height: accuracyRadius * 2,
@@ -643,10 +648,10 @@ export default function MapaViewerScreen() {
                     marginTop: -(accuracyRadius - 14),
                   }]} />
                 )}
-                {/* Ponto central — tamanho FIXO, contra-escala o zoom */}
+                {/* Ponto central — azul dentro do mapa, laranja na borda */}
                 <Animated.View style={dotCounterScaleStyle}>
                   <View style={st.dotOuter}>
-                    <View style={st.dotInner} />
+                    <View style={[st.dotInner, dotClamped && { backgroundColor: '#f59e0b' }]} />
                   </View>
                 </Animated.View>
               </View>
