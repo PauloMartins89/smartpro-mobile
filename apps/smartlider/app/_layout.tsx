@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Clipboard, Animated } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Clipboard, Animated, AppState } from 'react-native'
 import * as Updates from 'expo-updates'
 import * as SplashScreen from 'expo-splash-screen'
 import { Stack } from 'expo-router'
@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons'
 import useLiderStore from '../src/store/useLiderStore'
 import type { LiderPerfil } from '../src/store/useLiderStore'
 import { initLogger, getLogs } from '../src/lib/logger'
+import { iniciarTelemetria, finalizarTelemetria, flushTelemetria } from '../src/lib/telemetria'
 import SplashAnimated from '../src/components/splash/SplashAnimated'
 
 initLogger()
@@ -275,6 +276,24 @@ export default function RootLayout() {
   const pendingReadyRef = useRef(false)
   const pendingNavRef   = useRef<(() => void) | null>(null)
 
+  // ── Telemetria: controle de background ──────────────────────────────────
+  const bgTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'active') {
+        // App voltou ao foreground → cancela timer de finalização
+        if (bgTimer.current) { clearTimeout(bgTimer.current); bgTimer.current = null }
+        // Flush pendentes
+        flushTelemetria().catch(() => {})
+      } else if (state === 'background') {
+        // Finaliza sessão após 5 min em background (usuário saiu do campo)
+        bgTimer.current = setTimeout(() => { finalizarTelemetria().catch(() => {}) }, 5 * 60_000)
+      }
+    })
+    return () => sub.remove()
+  }, [])
+
   // Oculta splash nativo tão logo nossa tela custom está montada (mesmo BG → sem flash)
   useEffect(() => {
     SplashScreen.hideAsync().catch(() => {})
@@ -332,6 +351,11 @@ export default function RootLayout() {
         if (session) {
           await fetchAndSetLiderPerfil(session.user.id, setLiderPerfil)
           setStatus('Carregando perfil...')
+          // Inicia telemetria de campo em background (silencioso)
+          const perfil = useLiderStore.getState().liderPerfil
+          if (perfil?.workspace_id) {
+            iniciarTelemetria({ userId: session.user.id, workspaceId: perfil.workspace_id }).catch(() => {})
+          }
         }
 
         // ── FASE 3: Navegar (aguarda splash se ainda em andamento) ───────────

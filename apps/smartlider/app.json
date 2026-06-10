@@ -26,7 +26,8 @@
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION"
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION"
       ]
     },
     "plugins": [
@@ -47,7 +48,9 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Permite mostrar sua posição nos mapas de campo."
+        "locationAlwaysAndWhenInUsePermission": "Permite mostrar sua posição nos mapas de campo e registrar a jornada de trabalho.",
+          "locationAlwaysUsageDescription": "Necessário para registrar o trajeto em campo mesmo com a tela bloqueada.",
+          "locationWhenInUseUsageDescription": "Permite exibir sua posição no mapa de campo."
         }
       ],
       [
