@@ -1,8 +1,8 @@
 ﻿// @ts-nocheck
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  ActivityIndicator, Alert, RefreshControl,
+  ActivityIndicator, Alert, RefreshControl, TextInput,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter, useNavigation } from 'expo-router'
@@ -34,7 +34,8 @@ export default function MapaListScreen() {
   const [loading,    setLoading]    = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [dlStatus,   setDlStatus]   = useState({})   // { [id]: 'idle'|'downloading'|'done' }
-  const [dlProgress, setDlProgress] = useState({})   // { [id]: 0â€“1 }
+  const [dlProgress, setDlProgress] = useState({})   // { [id]: 0–1 }
+  const [search,     setSearch]     = useState('')
   const dlRef = useRef({})
 
   useEffect(() => {
@@ -203,19 +204,53 @@ export default function MapaListScreen() {
     )
   }, [dlStatus, dlProgress, baixar, removerCache, router])
 
+  const mapasFiltrados = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return q ? mapas.filter(m => m.nome.toLowerCase().includes(q)) : mapas
+  }, [mapas, search])
+
   const ListEmpty = useCallback(() => (
     loading ? null : (
       <View style={st.empty}>
         <Ionicons name="map-outline" size={48} color={C.textMuted} />
-        <Text style={st.emptyTitle}>Nenhum mapa disponível</Text>
-        <Text style={st.emptySub}>
-          Toque no{' '}
-          <Text style={{ color: C.primary, fontWeight: '700' }}>+</Text>
-          {' '}no canto superior para adicionar um mapa.
-        </Text>
+        {search.trim()
+          ? <>
+              <Text style={st.emptyTitle}>Nenhum resultado</Text>
+              <Text style={st.emptySub}>Nenhum mapa encontrado para "{search.trim()}"</Text>
+            </>
+          : <>
+              <Text style={st.emptyTitle}>Nenhum mapa disponível</Text>
+              <Text style={st.emptySub}>
+                Toque no{' '}
+                <Text style={{ color: C.primary, fontWeight: '700' }}>+</Text>
+                {' '}no canto superior para adicionar um mapa.
+              </Text>
+            </>
+        }
       </View>
     )
-  ), [loading])
+  ), [loading, search])
+
+  const ListHeader = (
+    <View style={st.searchWrap}>
+      <Ionicons name="search-outline" size={16} color={C.textMuted} style={{ marginLeft: 12 }} />
+      <TextInput
+        style={st.searchInput}
+        placeholder="Buscar mapa por nome..."
+        placeholderTextColor={C.textMuted}
+        value={search}
+        onChangeText={setSearch}
+        clearButtonMode="while-editing"
+        returnKeyType="search"
+        autoCorrect={false}
+      />
+      {search.length > 0 && (
+        <TouchableOpacity onPress={() => setSearch('')} hitSlop={8} style={{ paddingRight: 12 }}>
+          <Ionicons name="close-circle" size={16} color={C.textMuted} />
+        </TouchableOpacity>
+      )}
+    </View>
+  )
 
   if (loading) return (
     <View style={st.center}>
@@ -228,9 +263,10 @@ export default function MapaListScreen() {
       style={st.root}
       contentContainerStyle={{ padding: 16, flexGrow: 1 }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => carregar(true)} tintColor={C.primary} />}
-      data={mapas}
+      data={mapasFiltrados}
       keyExtractor={m => m.id}
       renderItem={renderItem}
+      ListHeaderComponent={ListHeader}
       ListEmptyComponent={ListEmpty}
       removeClippedSubviews
       maxToRenderPerBatch={10}
@@ -273,4 +309,10 @@ const st = StyleSheet.create({
 
   dlBtn:         { paddingHorizontal: 14, paddingVertical: 14, alignSelf: 'stretch',
                    justifyContent: 'center', borderLeftWidth: 1, borderLeftColor: C.border },
+
+  searchWrap:    { flexDirection: 'row', alignItems: 'center', backgroundColor: C.bgCard,
+                   borderRadius: 12, borderWidth: 1, borderColor: C.border,
+                   marginBottom: 12 },
+  searchInput:   { flex: 1, paddingHorizontal: 10, paddingVertical: 10, fontSize: 14,
+                   color: C.text },
 })
