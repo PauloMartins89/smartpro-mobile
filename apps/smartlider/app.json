@@ -67,12 +67,7 @@
       ],
       ["./plugins/withAbiFilters", { "abiFilters": ["arm64-v8a", "armeabi-v7a"] }],
       ["./plugins/withSplashBackground", { "color": "#0B1A3B" }],
-      [
-        "react-native-maps",
-        {
-          "googleMapsApiKey": ""
-        }
-      ]
+      ["./plugins/withGoogleMaps"]
     ],
     "experiments": {
       "typedRoutes": true
