@@ -439,7 +439,6 @@ export default function MapaViewerScreen() {
   const midLng   = hasGpsBbox ? (mapa.sw_lng + mapa.ne_lng) / 2 : -47
   const deltaLat = hasGpsBbox ? (mapa.ne_lat - mapa.sw_lat) * 1.4 : 0.02
   const deltaLng = hasGpsBbox ? (mapa.ne_lng - mapa.sw_lng) * 1.4 : 0.02
-  }
 
   return (
     <View style={[st.root, !fullscreen && { paddingBottom: insets.bottom }]}>
