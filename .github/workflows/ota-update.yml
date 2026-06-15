@@ -25,11 +25,7 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
-      - name: Instalar dependencias (monorepo root)
-        run: npm ci --legacy-peer-deps
-
-      - name: Instalar dependencias (smartlider)
-        working-directory: apps/smartlider
+      - name: Instalar dependencias
         run: npm ci --legacy-peer-deps
 
       - name: Verificar autenticacao EAS
