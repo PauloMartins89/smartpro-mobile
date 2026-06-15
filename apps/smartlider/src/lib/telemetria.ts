@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Serviço de Telemetria de Campo — SmartLíder
  *
  * Responsabilidades:
@@ -193,12 +193,12 @@ export async function iniciarTelemetria(params: {
     return
   }
 
-  // Solicita permissão de localização
-  const { status } = await Location.requestForegroundPermissionsAsync()
+  // Verifica permissao (NAO solicita — solicitacao feita no boot pelo _layout.tsx)
+  const { status } = await Location.getForegroundPermissionsAsync()
   console.log('[Telemetria] permissão foreground:', status)
   if (status !== 'granted') return
 
-  const bgPerm = await Location.requestBackgroundPermissionsAsync()
+  const bgPerm = await Location.getBackgroundPermissionsAsync()  // check-only: solicitar aqui causa crash no Android 11+
   console.log('[Telemetria] permissão background:', bgPerm.status)
 
   // Cria sessão no banco (ou tenta enviar pendente do MMKV)
