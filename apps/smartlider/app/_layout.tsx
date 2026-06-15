@@ -268,11 +268,12 @@ export default function RootLayout() {
   const setLiderPerfil = useLiderStore(s => s.setLiderPerfil)
   const setWorkspaceId = useLiderStore(s => s.setWorkspaceId)
 
-  const [phase,  setPhase]  = useState<Phase>('boot')
-  const [status, setStatus] = useState('Iniciando...')
+  const [phase,     setPhase]     = useState<Phase>('boot')
+  const [status,    setStatus]    = useState('Iniciando...')
+  const [splashDone, setSplashDone] = useState(false)
   const splashHidden = useRef(false)
 
-  // Refs de coordenação entre boot() assíncrono e SplashAnimated (2.5s)
+  // Refs de coordenação entre boot() assíncrono e SplashAnimated (3s)
   const splashDoneRef   = useRef(false)
   const pendingReadyRef = useRef(false)
   const pendingNavRef   = useRef<(() => void) | null>(null)
@@ -318,9 +319,10 @@ export default function RootLayout() {
     SplashScreen.hideAsync().catch(() => {})
   }, [])
 
-  // Chamado pelo SplashAnimated quando a animação de 2.5s termina
+  // Chamado pelo SplashAnimated quando a animação de ~3s termina (fade-out concluído)
   const onSplashFinish = useCallback(() => {
     splashDoneRef.current = true
+    setSplashDone(true)  // força re-render → mostra BootScreen enquanto boot ainda roda
     if (pendingReadyRef.current) {
       setPhase('ready')
       pendingNavRef.current?.()
@@ -357,7 +359,13 @@ export default function RootLayout() {
             // Mostra tela de atualização explícita — não parece crash
             setPhase('updating')
             console.log('[OTA] baixando bundle...')
-            await Updates.fetchUpdateAsync()
+            // Timeout de 30s no download — evita tela de updating eternamente
+            await Promise.race([
+              Updates.fetchUpdateAsync(),
+              new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('OTA fetch timeout')), 30000)
+              ),
+            ])
             console.log('[OTA] aplicando...')
             await Updates.reloadAsync()
             return // reloadAsync reinicia — não continua aqui
@@ -370,7 +378,11 @@ export default function RootLayout() {
       // ── FASE 2: Autenticar ─────────────────────────────────────────────────
       try {
         setStatus('Autenticando...')
-        const { data: { session } } = await supabase.auth.getSession()
+        // Timeout de 10s — evita trava infinita se Supabase não responder
+        const session = await Promise.race([
+          supabase.auth.getSession().then(r => r.data.session),
+          new Promise<null>(resolve => setTimeout(() => resolve(null), 10000)),
+        ])
         console.log('[Boot] session:', !!session)
 
         if (session) {
@@ -425,8 +437,11 @@ export default function RootLayout() {
     boot()
   }, [])
 
-  // ── FASE boot: splash animado premium (2.5s) ────────────────────────────
+  // ── FASE boot: splash animado (3s) → depois BootScreen enquanto boot termina ──
   if (phase === 'boot') {
+    // Após o fade-out do splash, exibe BootScreen com status atual
+    // (evita tela preta/invisible quando Supabase demora mais que 3s)
+    if (splashDone) return <BootScreen status={status} />
     return <SplashAnimated onFinish={onSplashFinish} />
   }
 
