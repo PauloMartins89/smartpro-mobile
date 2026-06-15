@@ -1,4 +1,5 @@
 ﻿/**
+ * @version 1.0.7-ota
  * clima.ts — Captura automática de condições climáticas via GPS + Open-Meteo.
  * Chamado ao criar um turno. Nunca bloqueia o fluxo principal (falha silenciosa).
  */
