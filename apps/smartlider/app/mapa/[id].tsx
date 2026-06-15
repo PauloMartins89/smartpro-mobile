@@ -492,7 +492,7 @@ export default function MapaViewerScreen() {
             <Marker
               coordinate={{ latitude: gps.latitude, longitude: gps.longitude }}
               anchor={{ x: 0.5, y: 0.5 }}
-              flat={true}
+              flat={false}
               tracksViewChanges={false}
             >
               <View style={st.dotOuter}>
@@ -925,7 +925,7 @@ export default function MapaViewerScreen() {
   )
 }
 
-const DOT = 20
+const DOT = 14
 
 const st = StyleSheet.create({
   root:        { flex: 1, backgroundColor: '#111' },
