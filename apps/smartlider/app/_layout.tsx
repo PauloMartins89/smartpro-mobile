@@ -344,7 +344,13 @@ export default function RootLayout() {
         try {
           setStatus('Verificando atualizações...')
           console.log('[OTA] checkForUpdateAsync...')
-          const check = await Updates.checkForUpdateAsync()
+          // Timeout de 5s — evita travar o boot se a rede ou EAS não responder
+          const check = await Promise.race([
+            Updates.checkForUpdateAsync(),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('OTA timeout')), 5000)
+            ),
+          ])
           console.log('[OTA] isAvailable:', check.isAvailable)
 
           if (check.isAvailable) {
