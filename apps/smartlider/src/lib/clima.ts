@@ -1,4 +1,4 @@
-/**
+﻿/**
  * clima.ts — Captura automática de condições climáticas via GPS + Open-Meteo.
  * Chamado ao criar um turno. Nunca bloqueia o fluxo principal (falha silenciosa).
  */
@@ -26,14 +26,17 @@ export async function captureClima(params: {
   userId?:     string
 }): Promise<void> {
   try {
-    // 1. Solicita permissão de localização (foreground)
-    const { status } = await Location.requestForegroundPermissionsAsync()
+    // 1. Verifica permissao (NAO solicita — diálogo deve ser pedido no boot, nao durante navegacao)
+    const { status } = await Location.getForegroundPermissionsAsync()
     if (status !== 'granted') return
 
-    // 2. Obtém coordenadas atuais (timeout 8s)
-    const pos = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced,
-    })
+    // 2. Obtém coordenadas (timeout real de 8s)
+    const pos = await Promise.race([
+      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('location timeout')), 8_000)
+      ),
+    ])
     const { latitude, longitude } = pos.coords
 
     // 3. Chama Open-Meteo (gratuito, sem chave)
@@ -43,7 +46,14 @@ export async function captureClima(params: {
       `&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,precipitation` +
       `&timezone=auto&forecast_days=1`
 
-    const res = await fetch(url, { signal: AbortSignal.timeout(10_000) })
+    const controller = new AbortController()
+    const abortTimer = setTimeout(() => controller.abort(), 10_000)
+    let res: Response
+    try {
+      res = await fetch(url, { signal: controller.signal })
+    } finally {
+      clearTimeout(abortTimer)
+    }
     if (!res.ok) return
 
     const json = await res.json()

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react'
+﻿import { useEffect, useState, useRef, useCallback } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Clipboard, Animated, AppState } from 'react-native'
 import * as Updates from 'expo-updates'
 import * as SplashScreen from 'expo-splash-screen'
@@ -17,6 +17,7 @@ import type { LiderPerfil } from '../src/store/useLiderStore'
 import { initLogger, getLogs } from '../src/lib/logger'
 import { iniciarTelemetria, finalizarTelemetria, flushTelemetria } from '../src/lib/telemetria'
 import SplashAnimated from '../src/components/splash/SplashAnimated'
+import * as Location from 'expo-location'
 
 initLogger()
 
@@ -293,6 +294,12 @@ export default function RootLayout() {
     })
     return () => sub.remove()
   }, [])
+  // Solicita permissao de localizacao apos o app estar pronto (foreground estavel)
+  useEffect(() => {
+    if (phase !== 'ready') return
+    Location.requestForegroundPermissionsAsync().catch(() => {})
+  }, [phase])
+
 
   // Oculta splash nativo tão logo nossa tela custom está montada (mesmo BG → sem flash)
   useEffect(() => {
