@@ -1,5 +1,5 @@
 ﻿/**
- * clima.ts — v1.0.7 — Captura automática de condições climáticas via GPS + Open-Meteo.
+ * clima.ts — Captura automática de condições climáticas via GPS + Open-Meteo.
  * Chamado ao criar um turno. Nunca bloqueia o fluxo principal (falha silenciosa).
  */
 import * as Location from 'expo-location'
