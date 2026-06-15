@@ -5,19 +5,29 @@ import {
   ActivityIndicator, Dimensions, Alert,
   Modal, TextInput, FlatList, KeyboardAvoidingView, Platform, Linking,
 } from 'react-native'
+import Animated, {
+  useSharedValue, useAnimatedStyle, withSpring, withTiming,
+} from 'react-native-reanimated'
 import { Ionicons } from '@expo/vector-icons'
+import { GestureDetector, Gesture } from 'react-native-gesture-handler'
 import { useLocalSearchParams, useNavigation } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Location from 'expo-location'
 import * as FileSystem from 'expo-file-system/legacy'
 import * as ImagePicker from 'expo-image-picker'
-import MapView, { Overlay, Marker, Polyline, Circle, PROVIDER_GOOGLE } from 'react-native-maps'
 import { supabase } from '../../src/lib/supabase'
 import { C } from '../../src/lib/theme'
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window')
 const LOCAL_DIR = (FileSystem.cacheDirectory ?? '') + 'mapas/'
 const localPath = (id) => LOCAL_DIR + id + '.png'
+
+// Converte lat/lng → posição proporcional (0–1) na imagem
+function gpsToFrac(lat, lng, sw_lat, sw_lng, ne_lat, ne_lng) {
+  const x = (lng - sw_lng) / (ne_lng - sw_lng)           // esquerda→direita
+  const y = (ne_lat - lat) / (ne_lat - sw_lat)           // topo→base (invertido)
+  return { x, y }
+}
 
 // Verifica se posição está dentro do bbox do mapa
 function dentroDoMapa(lat, lng, mapa) {
@@ -97,9 +107,22 @@ export default function MapaViewerScreen() {
 
   const [mapa,     setMapa]     = useState(null)
   const [loading,  setLoading]  = useState(true)
-  const [mapType,  setMapType]  = useState('satellite')   // 'satellite' | 'standard'
-  const [overlayOpacity, setOverlayOpacity] = useState(0.85)
-  const mapRef     = useRef(null)
+  const [imgSize,  setImgSize]  = useState<{ w: number, h: number } | null>(null)
+  // ── Reanimated transform ──────────────────────────────────────────────────
+  const translateX  = useSharedValue(0)
+  const translateY  = useSharedValue(0)
+  const scaleVal    = useSharedValue(1)
+  const rotationVal = useSharedValue(0)
+  const panSavedX   = useSharedValue(0)
+  const panSavedY   = useSharedValue(0)
+  const savedScale  = useSharedValue(1)
+  const savedRot    = useSharedValue(0)
+  const pinchSavedTx = useSharedValue(0)
+  const pinchSavedTy = useSharedValue(0)
+  const pinchFx0     = useSharedValue(0)
+  const pinchFy0     = useSharedValue(0)
+  const imgW         = useSharedValue(0)
+  const imgH         = useSharedValue(0)
   const [gps,      setGps]      = useState(null)     // { latitude, longitude, accuracy }
   const [gpsErr,   setGpsErr]   = useState(null)
   const [tracking, setTracking] = useState(false)
@@ -115,8 +138,9 @@ export default function MapaViewerScreen() {
   const trajetoRef  = useRef([])
   const modoRef     = useRef('linha')
   const firstFixRef  = useRef(true)   // reseta ao parar GPS; dispara auto-zoom 1x por sessão
+  const imgSizeRef   = useRef<{ w: number, h: number } | null>(null) // ref para evitar closure stale
 
-  // ── UI modals ────────────────────────────────────────────────────────
+  // ── UI modals ────────────────────────────────────────────────────
   const [menuOpen,    setMenuOpen]    = useState(false)
   const [coordModal,  setCoordModal]  = useState(false)
   const [mediaModal,  setMediaModal]  = useState(false)
@@ -146,14 +170,35 @@ export default function MapaViewerScreen() {
         .select('*')
         .eq('id', id)
         .single()
-      if (!data) { setLoading(false); return }
+      if (!data) return
+      console.log('[mapa] bbox:', data.sw_lat, data.sw_lng, data.ne_lat, data.ne_lng)
       setMapa(data)
       nav.setOptions({ title: data.nome })
 
-      // Verifica cache local
-      const info = await FileSystem.getInfoAsync(localPath(id))
-      if (info.exists) setLocalUri(localPath(id))
-      setLoading(false)
+      // Usa dimensões REAIS da imagem — a Image só é renderizada DEPOIS que as
+      // dimensões reais chegam aqui, evitando que o Fresco (Android) decodifique
+      // em baixa resolução no primeiro render (SCREEN_W × SCREEN_W)
+      Image.getSize(data.imagem_url, async (iw, ih) => {
+        const initScale = SCREEN_W / iw
+        // Centro da imagem fica no centro da tela:
+        //   visual_center = element_center + translate  →  translate = screen_center - element_center
+        const initTx = SCREEN_W / 2 - iw / 2
+        const initTy = SCREEN_H / 2 - ih / 2
+        imgSizeRef.current = { w: iw, h: ih }
+        setImgSize({ w: iw, h: ih })
+        imgW.value        = iw
+        imgH.value        = ih
+        scaleVal.value    = initScale
+        savedScale.value  = initScale
+        translateX.value  = initTx
+        translateY.value  = initTy
+        panSavedX.value   = initTx
+        panSavedY.value   = initTy
+        // Verifica cache local e libera o render somente agora
+        const info = await FileSystem.getInfoAsync(localPath(id))
+        if (info.exists) setLocalUri(localPath(id))
+        setLoading(false)
+      })
     }
     load()
   }, [id])
@@ -200,12 +245,15 @@ export default function MapaViewerScreen() {
         // Auto-zoom na primeira posição GPS da sessão
         if (firstFixRef.current && mapa && mapa.sw_lat != null && dentroDoMapa(latitude, longitude, mapa)) {
           firstFixRef.current = false
-          mapRef.current?.animateToRegion({
-            latitude,
-            longitude,
-            latitudeDelta: 0.0008,
-            longitudeDelta: 0.0008,
-          }, 800)
+          const frac = gpsToFrac(latitude, longitude, mapa.sw_lat, mapa.sw_lng, mapa.ne_lat, mapa.ne_lng)
+          const iW = imgSizeRef.current.w
+          const iH = imgSizeRef.current.h
+          const targetScale = 2.5
+          const fx = frac.x * iW
+          const fy = frac.y * iH
+          scaleVal.value = withSpring(targetScale, { damping: 18, stiffness: 150 })
+          translateX.value = withSpring(SCREEN_W / 2 - iW / 2 - (fx - iW / 2) * targetScale, { damping: 18, stiffness: 150 })
+          translateY.value = withSpring(SCREEN_H / 2 - iH / 2 - (fy - iH / 2) * targetScale, { damping: 18, stiffness: 150 })
         }
         if (gravarRef.current) {
           const pt = { lat: latitude, lng: longitude, ts: Date.now() }
@@ -407,38 +455,113 @@ export default function MapaViewerScreen() {
   useEffect(() => () => locSub.current?.remove(), [])
 
   // ── Gestures (Pan + Pinch + Rotation simultâneos) ────────────────────────
-  // ── MapView interaction ───────────────────────────────────────────────────
-  const centrarNoGps = useCallback(() => {
-    if (!gps || !mapRef.current) return
-    mapRef.current.animateToRegion({
-      latitude: gps.latitude,
-      longitude: gps.longitude,
-      latitudeDelta: 0.0008,
-      longitudeDelta: 0.0008,
-    }, 600)
-  }, [gps])
-
-  const cycleOpacity = useCallback(() => {
-    setOverlayOpacity(prev => {
-      const steps = [0.85, 0.55, 0.25, 0.0]
-      const idx = steps.findIndex(s => Math.abs(s - prev) < 0.05)
-      return steps[(idx + 1) % steps.length]
+  const panGesture = Gesture.Pan()
+    .maxPointers(1)
+    .onStart(() => {
+      panSavedX.value = translateX.value
+      panSavedY.value = translateY.value
     })
-  }, [])
+    .onUpdate(e => {
+      translateX.value = panSavedX.value + e.translationX
+      translateY.value = panSavedY.value + e.translationY
+    })
+
+  const pinchGesture = Gesture.Pinch()
+    .onStart(e => {
+      savedScale.value   = scaleVal.value
+      pinchSavedTx.value = translateX.value
+      pinchSavedTy.value = translateY.value
+      pinchFx0.value     = e.focalX
+      pinchFy0.value     = e.focalY
+    })
+    .onUpdate(e => {
+      const s0    = savedScale.value
+      const s_new = Math.min(8, Math.max(0.3, s0 * e.scale))
+      const ratio = s_new / s0
+      const hw    = imgW.value / 2
+      const hh    = imgH.value / 2
+      scaleVal.value   = s_new
+      translateX.value = e.focalX - hw - (pinchFx0.value - hw - pinchSavedTx.value) * ratio
+      translateY.value = e.focalY - hh - (pinchFy0.value - hh - pinchSavedTy.value) * ratio
+    })
+    .onEnd(() => {
+      panSavedX.value = translateX.value
+      panSavedY.value = translateY.value
+    })
+
+  const rotationGesture = Gesture.Rotation()
+    .onStart(() => { savedRot.value = rotationVal.value })
+    .onUpdate(e => { rotationVal.value = savedRot.value + e.rotation })
+
+  const composed = Gesture.Simultaneous(panGesture, Gesture.Simultaneous(pinchGesture, rotationGesture))
+
+  const mapAnimStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { scale: scaleVal.value },
+      { rotate: `${rotationVal.value}rad` },
+    ],
+  }))
+
+  // Counter-scale para o dot GPS — mantém tamanho fixo independente do zoom
+  const dotCounterScaleStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: 1 / scaleVal.value }],
+  }))
+
+  // ── Zoom helpers ──────────────────────────────────────────────────────────
+  const zoomIn  = () => {
+    scaleVal.value = withTiming(Math.min(8, scaleVal.value + 0.5), { duration: 200 })
+  }
+  const zoomOut = () => {
+    scaleVal.value = withTiming(Math.max(0.3, scaleVal.value - 0.5), { duration: 200 })
+  }
+
+  // Centraliza o mapa na posição GPS atual com zoom de navegação
+  const centrarNoGps = useCallback(() => {
+    if (!gps || !mapa || !imgSize || mapa.sw_lat == null) return
+    const frac = gpsToFrac(gps.latitude, gps.longitude, mapa.sw_lat, mapa.sw_lng, mapa.ne_lat, mapa.ne_lng)
+    const iW = imgSize.w
+    const iH = imgSize.h
+    const targetScale = Math.max(scaleVal.value, 2.5)
+    const fx = frac.x * iW
+    const fy = frac.y * iH
+    scaleVal.value = withSpring(targetScale, { damping: 18, stiffness: 150 })
+    translateX.value = withSpring(SCREEN_W / 2 - iW / 2 - (fx - iW / 2) * targetScale, { damping: 18, stiffness: 150 })
+    translateY.value = withSpring(SCREEN_H / 2 - iH / 2 - (fy - iH / 2) * targetScale, { damping: 18, stiffness: 150 })
+  }, [gps, mapa, imgSize])
 
   // ── Loading ───────────────────────────────────────────────────────────────
-  if (loading || !mapa) return (
+  // imgSize é definido dentro do callback Image.getSize, antes de setLoading(false)
+  if (loading || !mapa || !imgSize) return (
     <View style={st.center}>
       <ActivityIndicator size="large" color={C.primary} />
     </View>
   )
 
+  // ── Posição do dot GPS (coordenadas naturais — escala aplicada pelo Animated.View) ──
   const hasGpsBbox = mapa.sw_lat != null && mapa.sw_lng != null &&
                      mapa.ne_lat != null && mapa.ne_lng != null
-  const midLat   = hasGpsBbox ? (mapa.sw_lat + mapa.ne_lat) / 2 : -15
-  const midLng   = hasGpsBbox ? (mapa.sw_lng + mapa.ne_lng) / 2 : -47
-  const deltaLat = hasGpsBbox ? (mapa.ne_lat - mapa.sw_lat) * 1.4 : 0.02
-  const deltaLng = hasGpsBbox ? (mapa.ne_lng - mapa.sw_lng) * 1.4 : 0.02
+  let dotX = null, dotY = null
+  let dotClamped = false   // true quando GPS está fora do mapa → dot fica na borda
+  if (gps && hasGpsBbox) {
+    const frac = gpsToFrac(gps.latitude, gps.longitude,
+                           mapa.sw_lat, mapa.sw_lng, mapa.ne_lat, mapa.ne_lng)
+    const rawX = frac.x * imgSize.w
+    const rawY = frac.y * imgSize.h
+    dotClamped = rawX < 0 || rawX > imgSize.w || rawY < 0 || rawY > imgSize.h
+    // Clampear na borda do mapa — dot fica parado no limite na mesma direção
+    dotX = Math.max(0, Math.min(imgSize.w, rawX))
+    dotY = Math.max(0, Math.min(imgSize.h, rawY))
+    // mapas sem bbox (hasGpsBbox=false): sem dot — GPS só aparece no chip de coords
+  }
+
+  // Raio de precisão em pixels naturais — só mostra quando dentro do mapa com bbox
+  let accuracyRadius = 0
+  if (gps && gps.accuracy && hasGpsBbox && !dotClamped) {
+    const metersPerPx = ((mapa.ne_lng - mapa.sw_lng) * 111320) / imgSize.w
+    accuracyRadius = gps.accuracy / metersPerPx
+  }
 
   return (
     <View style={[st.root, !fullscreen && { paddingBottom: insets.bottom }]}>
@@ -450,141 +573,146 @@ export default function MapaViewerScreen() {
         </View>
       )}
 
-      {/* ── Área do mapa ─────────────────────────────────────────────────────── */}
-      {hasGpsBbox ? (
-        <MapView
-          ref={mapRef}
-          provider={PROVIDER_GOOGLE}
-          mapType={mapType}
-          style={{ flex: 1 }}
-          initialRegion={{
-            latitude: midLat,
-            longitude: midLng,
-            latitudeDelta: deltaLat,
-            longitudeDelta: deltaLng,
-          }}
-          rotateEnabled={false}
-          toolbarEnabled={false}
-          loadingEnabled={true}
-        >
-          {/* Overlay: PNG georreferenciado sobreposto ao mapa base */}
-          {overlayOpacity > 0 && (
-            <Overlay
-              bounds={[[mapa.sw_lat, mapa.sw_lng], [mapa.ne_lat, mapa.ne_lng]]}
-              image={{ uri: localUri ?? mapa.imagem_url }}
-              opacity={overlayOpacity}
+      {/* Mapa com GPS overlay — gestures fluidos (Pan + Pinch + Rotation) */}
+      <GestureDetector gesture={composed}>
+      <View style={st.scroll} collapsable={false}>
+        <Animated.View style={[{ width: imgSize.w, height: imgSize.h, position: 'absolute' }, mapAnimStyle]}>
+            {/* Imagem do mapa (local cache ou URL) */}
+            <Image
+              source={{ uri: localUri ?? mapa.imagem_url }}
+              style={{ width: imgSize.w, height: imgSize.h }}
+              resizeMode="stretch"
             />
-          )}
 
-          {/* Círculo de precisão GPS */}
-          {gps && gps.accuracy != null && (
-            <Circle
-              center={{ latitude: gps.latitude, longitude: gps.longitude }}
-              radius={gps.accuracy}
-              strokeColor="rgba(66,133,244,0.5)"
-              fillColor="rgba(66,133,244,0.18)"
-              strokeWidth={1}
-            />
-          )}
+            {/* ── Trajeto gravado ── */}
+            {/* Fecho do polígono: último → primeiro ponto */}
+            {modo === 'poligonal' && trajeto.length >= 3 && (() => {
+              const pt1 = trajeto[trajeto.length - 1]
+              const pt2 = trajeto[0]
+              const f1  = gpsToFrac(pt1.lat, pt1.lng, mapa.sw_lat, mapa.sw_lng, mapa.ne_lat, mapa.ne_lng)
+              const f2  = gpsToFrac(pt2.lat, pt2.lng, mapa.sw_lat, mapa.sw_lng, mapa.ne_lat, mapa.ne_lng)
+              const x1 = f1.x * imgSize.w, y1 = f1.y * imgSize.h
+              const x2 = f2.x * imgSize.w, y2 = f2.y * imgSize.h
+              const dx = x2 - x1, dy = y2 - y1
+              const len = Math.sqrt(dx * dx + dy * dy)
+              if (len < 1) return null
+              const angle = Math.atan2(dy, dx) * 180 / Math.PI
+              return (
+                <View
+                  key="seg-close"
+                  pointerEvents="none"
+                  style={{
+                    position: 'absolute',
+                    left: (x1 + x2) / 2 - len / 2,
+                    top:  (y1 + y2) / 2 - 2,
+                    width: len,
+                    height: 4,
+                    backgroundColor: '#f59e0b',
+                    borderRadius: 2,
+                    opacity: 0.88,
+                    transform: [{ rotate: `${angle}deg` }],
+                  }}
+                />
+              )
+            })()}
+            {trajeto.length > 1 && trajeto.slice(0, -1).map((pt, i) => {
+              const pt2 = trajeto[i + 1]
+              const f1  = gpsToFrac(pt.lat,  pt.lng,  mapa.sw_lat, mapa.sw_lng, mapa.ne_lat, mapa.ne_lng)
+              const f2  = gpsToFrac(pt2.lat, pt2.lng, mapa.sw_lat, mapa.sw_lng, mapa.ne_lat, mapa.ne_lng)
+              const x1 = f1.x * imgSize.w, y1 = f1.y * imgSize.h
+              const x2 = f2.x * imgSize.w, y2 = f2.y * imgSize.h
+              const dx = x2 - x1, dy = y2 - y1
+              const len = Math.sqrt(dx * dx + dy * dy)
+              if (len < 1) return null
+              const angle = Math.atan2(dy, dx) * 180 / Math.PI
+              return (
+                <View
+                  key={`seg-${i}`}
+                  pointerEvents="none"
+                  style={{
+                    position: 'absolute',
+                    left: (x1 + x2) / 2 - len / 2,
+                    top:  (y1 + y2) / 2 - 2,
+                    width: len,
+                    height: 4,
+                    backgroundColor: '#ef4444',
+                    borderRadius: 2,
+                    opacity: 0.88,
+                    transform: [{ rotate: `${angle}deg` }],
+                  }}
+                />
+              )
+            })}
 
-          {/* Dot GPS */}
-          {gps && (
-            <Marker
-              coordinate={{ latitude: gps.latitude, longitude: gps.longitude }}
-              anchor={{ x: 0.5, y: 0.5 }}
-              flat={false}
-              tracksViewChanges={false}
-            >
-              <View style={st.dotOuter}>
-                <View style={[st.dotInner, fora && { backgroundColor: '#f59e0b' }]} />
+            {/* Dot GPS */}
+            {dotX !== null && dotY !== null && (
+              <View style={[st.dotWrap, { left: dotX - 14, top: dotY - 14 }]}>
+                {/* Círculo de precisão — só quando dentro do mapa */}
+                {!dotClamped && accuracyRadius > 6 && (
+                  <View style={[st.accuracy, {
+                    width: accuracyRadius * 2,
+                    height: accuracyRadius * 2,
+                    borderRadius: accuracyRadius,
+                    marginLeft: -(accuracyRadius - 14),
+                    marginTop: -(accuracyRadius - 14),
+                  }]} />
+                )}
+                {/* Ponto central — azul dentro do mapa, laranja na borda */}
+                <Animated.View style={dotCounterScaleStyle}>
+                  <View style={st.dotOuter}>
+                    <View style={[st.dotInner, dotClamped && { backgroundColor: '#f59e0b' }]} />
+                  </View>
+                </Animated.View>
               </View>
-            </Marker>
-          )}
+            )}
 
-          {/* Trajeto gravado atual */}
-          {trajeto.length > 1 && (
-            <Polyline
-              coordinates={trajeto.map(p => ({ latitude: p.lat, longitude: p.lng }))}
-              strokeColor="#ef4444"
-              strokeWidth={4}
-            />
-          )}
+            {/* Pino de coordenada buscada / média GPS */}
+            {coordPin && (() => {
+              const f = gpsToFrac(coordPin.lat, coordPin.lng, mapa.sw_lat, mapa.sw_lng, mapa.ne_lat, mapa.ne_lng)
+              return (
+                <View pointerEvents="none" style={[st.coordPin, { left: f.x * imgSize.w - 14, top: f.y * imgSize.h - 32 }]}>
+                  <Ionicons name="location" size={28} color="#f59e0b" />
+                  {!!coordPin.label && <Text style={st.coordPinLabel}>{coordPin.label}</Text>}
+                </View>
+              )
+            })()}
 
-          {/* Fecho do polígono (tracejado âmbar) */}
-          {modo === 'poligonal' && trajeto.length >= 3 && (
-            <Polyline
-              coordinates={[
-                { latitude: trajeto[trajeto.length - 1].lat, longitude: trajeto[trajeto.length - 1].lng },
-                { latitude: trajeto[0].lat, longitude: trajeto[0].lng },
-              ]}
-              strokeColor="#f59e0b"
-              strokeWidth={4}
-              lineDashPattern={[8, 4]}
-            />
-          )}
+            {/* Pontos / fotos plotadas */}
+            {pontos.map(p => {
+              const f = gpsToFrac(p.lat, p.lng, mapa.sw_lat, mapa.sw_lng, mapa.ne_lat, mapa.ne_lng)
+              return (
+                <TouchableOpacity
+                  key={p.id}
+                  style={[st.pontoBtn, { left: f.x * imgSize.w - 14, top: f.y * imgSize.h - 14 }]}
+                  onPress={() => Alert.alert('Foto plotada', `${p.lat.toFixed(6)}°, ${p.lng.toFixed(6)}°`)}>
+                  <Ionicons name="camera" size={16} color="#fff" />
+                </TouchableOpacity>
+              )
+            })}
 
-          {/* Trajeto do histórico selecionado (azul) */}
-          {trajetoVer?.pontos?.length > 1 && (
-            <Polyline
-              coordinates={trajetoVer.pontos.map(p => ({ latitude: p.lat, longitude: p.lng }))}
-              strokeColor="#3b82f6"
-              strokeWidth={4}
-            />
-          )}
-          {trajetoVer?.tipo === 'poligonal' && trajetoVer?.pontos?.length >= 3 && (
-            <Polyline
-              coordinates={[
-                { latitude: trajetoVer.pontos[trajetoVer.pontos.length - 1].lat, longitude: trajetoVer.pontos[trajetoVer.pontos.length - 1].lng },
-                { latitude: trajetoVer.pontos[0].lat, longitude: trajetoVer.pontos[0].lng },
-              ]}
-              strokeColor="#3b82f6"
-              strokeWidth={4}
-              lineDashPattern={[8, 4]}
-            />
-          )}
-
-          {/* Pino de coordenada buscada / média GPS */}
-          {coordPin && (
-            <Marker
-              coordinate={{ latitude: coordPin.lat, longitude: coordPin.lng }}
-              anchor={{ x: 0.5, y: 1 }}
-              tracksViewChanges={false}
-            >
-              <View style={{ alignItems: 'center' }}>
-                <Ionicons name="location" size={32} color="#f59e0b" />
-                {!!coordPin.label && <Text style={st.coordPinLabel}>{coordPin.label}</Text>}
-              </View>
-            </Marker>
-          )}
-
-          {/* Pontos / fotos plotadas */}
-          {pontos.map(p => (
-            <Marker
-              key={p.id}
-              coordinate={{ latitude: p.lat, longitude: p.lng }}
-              anchor={{ x: 0.5, y: 0.5 }}
-              tracksViewChanges={false}
-              onPress={() => Alert.alert('Foto plotada', `${p.lat.toFixed(6)}°, ${p.lng.toFixed(6)}°`)}
-            >
-              <View style={st.pontoBtn}>
-                <Ionicons name="camera" size={16} color="#fff" />
-              </View>
-            </Marker>
-          ))}
-        </MapView>
-      ) : (
-        <View style={{ flex: 1, backgroundColor: '#111' }}>
-          <Image
-            source={{ uri: localUri ?? mapa.imagem_url }}
-            style={{ flex: 1 }}
-            resizeMode="contain"
-          />
-          <View style={st.noBboxBanner}>
-            <Ionicons name="information-circle-outline" size={14} color="rgba(255,255,255,0.65)" />
-            <Text style={st.noBboxTxt}>Sem coordenadas GPS — sobreposição no mapa não disponível</Text>
-          </View>
-        </View>
-      )}
+            {/* Trajeto do histórico selecionado (azul) */}
+            {trajetoVer?.pontos?.length > 1 && trajetoVer.pontos.slice(0, -1).map((pt, i) => {
+              const pt2 = trajetoVer.pontos[i + 1]
+              const f1 = gpsToFrac(pt.lat, pt.lng, mapa.sw_lat, mapa.sw_lng, mapa.ne_lat, mapa.ne_lng)
+              const f2 = gpsToFrac(pt2.lat, pt2.lng, mapa.sw_lat, mapa.sw_lng, mapa.ne_lat, mapa.ne_lng)
+              const x1 = f1.x * imgSize.w, y1 = f1.y * imgSize.h, x2 = f2.x * imgSize.w, y2 = f2.y * imgSize.h
+              const dx = x2 - x1, dy = y2 - y1
+              const len = Math.sqrt(dx * dx + dy * dy)
+              if (len < 1) return null
+              const angle = Math.atan2(dy, dx) * 180 / Math.PI
+              return (
+                <View key={`hist-${i}`} pointerEvents="none" style={{
+                  position: 'absolute',
+                  left: (x1 + x2) / 2 - len / 2, top: (y1 + y2) / 2 - 2,
+                  width: len, height: 4,
+                  backgroundColor: '#3b82f6', borderRadius: 2, opacity: 0.85,
+                  transform: [{ rotate: `${angle}deg` }],
+                }} />
+              )
+            })}
+        </Animated.View>
+      </View>
+      </GestureDetector>
 
       {/* ── Rosa dos ventos ─────────────────────────────────────────────────── */}
       {tracking && (
@@ -614,23 +742,13 @@ export default function MapaViewerScreen() {
           activeOpacity={0.85}>
           <Ionicons name={tracking ? 'locate' : 'locate-outline'} size={22} color='#fff' />
         </TouchableOpacity>
-        {hasGpsBbox && (
-          <>
-            <View style={st.toolDivider} />
-            <TouchableOpacity
-              style={st.toolBtn}
-              onPress={() => setMapType(t => t === 'satellite' ? 'standard' : 'satellite')}
-              activeOpacity={0.85}>
-              <Ionicons name={mapType === 'satellite' ? 'globe-outline' : 'map-outline'} size={20} color='#fff' />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[st.toolBtn, overlayOpacity === 0 && { opacity: 0.35 }]}
-              onPress={cycleOpacity}
-              activeOpacity={0.85}>
-              <Ionicons name="layers-outline" size={20} color='#fff' />
-            </TouchableOpacity>
-          </>
-        )}
+        <View style={st.toolDivider} />
+        <TouchableOpacity style={st.toolBtn} onPress={zoomIn} activeOpacity={0.85}>
+          <Ionicons name="add" size={22} color='#fff' />
+        </TouchableOpacity>
+        <TouchableOpacity style={st.toolBtn} onPress={zoomOut} activeOpacity={0.85}>
+          <Ionicons name="remove" size={22} color='#fff' />
+        </TouchableOpacity>
         <View style={st.toolDivider} />
         <TouchableOpacity style={st.toolBtn} onPress={() => setMenuOpen(true)} activeOpacity={0.85}>
           <Ionicons name="apps-outline" size={22} color='#fff' />
@@ -925,7 +1043,7 @@ export default function MapaViewerScreen() {
   )
 }
 
-const DOT = 14
+const DOT = 20
 
 const st = StyleSheet.create({
   root:        { flex: 1, backgroundColor: '#111' },
@@ -1002,16 +1120,11 @@ const st = StyleSheet.create({
   coordPin:    { position: 'absolute', alignItems: 'center' },
   coordPinLabel: { fontSize: 9, color: '#f59e0b', backgroundColor: 'rgba(0,0,0,0.7)',
                    borderRadius: 3, paddingHorizontal: 3, paddingVertical: 1, marginTop: -4 },
-  pontoBtn:    { width: 28, height: 28, borderRadius: 14,
+  pontoBtn:    { position: 'absolute', width: 28, height: 28, borderRadius: 14,
                  backgroundColor: '#3b82f6', justifyContent: 'center', alignItems: 'center',
                  borderWidth: 2, borderColor: '#fff',
                  shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
                  shadowOpacity: 0.3, shadowRadius: 2, elevation: 3 },
-
-  // ── Fallback (mapa sem GPS bounds) ───────────────────────────────────────
-  noBboxBanner: { backgroundColor: 'rgba(0,0,0,0.7)', flexDirection: 'row', alignItems: 'center',
-                  gap: 6, paddingHorizontal: 12, paddingVertical: 8 },
-  noBboxTxt:    { color: 'rgba(255,255,255,0.65)', fontSize: 11, flex: 1 },
 
   // ── Floating Toolbar ──────────────────────────────────────────────────────
   toolbar:      { position: 'absolute', right: 16, flexDirection: 'column', alignItems: 'center',
