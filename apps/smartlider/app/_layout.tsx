@@ -294,10 +294,22 @@ export default function RootLayout() {
     })
     return () => sub.remove()
   }, [])
-  // Solicita permissao de localizacao apos o app estar pronto (foreground estavel)
+  // Solicita permissoes de localizacao apos o app estar pronto (fase ready = UI estavel)
+  // Foreground primeiro; background somente se concedido (Android 11+: abre Settings)
   useEffect(() => {
     if (phase !== 'ready') return
-    Location.requestForegroundPermissionsAsync().catch(() => {})
+    const pedir = async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync()
+        if (status !== 'granted') return
+        // 800ms para o app estar completamente estavel antes de abrir Settings
+        await new Promise(r => setTimeout(r, 800))
+        await Location.requestBackgroundPermissionsAsync()
+      } catch {
+        // silencioso
+      }
+    }
+    pedir()
   }, [phase])
 
 
