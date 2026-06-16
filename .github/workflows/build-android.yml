@@ -57,7 +57,6 @@ jobs:
         working-directory: apps/smartlider
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
           ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
         run: |
           npx eas build \
