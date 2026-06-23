@@ -6,7 +6,8 @@ import useLiderStore from '../../src/store/useLiderStore'
 import { useFeature } from '../../src/lib/useFeature'
 import { C } from '../../src/lib/theme'
 
-const ITEMS_FIXOS = [
+// DDS e Mapas de Campo são INTEGRADOS — sempre visíveis (não são módulos contratáveis)
+const ITENS_INTEGRADOS = [
   { icon: 'shield-half-outline',       label: 'DDS',                route: '/dds'          },
   { icon: 'map-outline',               label: 'Mapas de Campo',     route: '/mapa'         },
   { icon: 'document-text-outline',     label: 'Fechar Dia / Boletim', route: '/fechamento' },
@@ -22,7 +23,7 @@ export default function MaisScreen() {
   const ITEMS = [
     showHistorico   && { icon: 'calendar-outline', label: 'Histórico de Turnos', route: '/turno/historico'          },
     showOcorrencias && { icon: 'warning-outline',  label: 'Ocorrências',         route: '/apontamento/ocorrencia'   },
-    ...ITEMS_FIXOS,
+    ...ITENS_INTEGRADOS,
   ].filter(Boolean)
 
   async function handleLogout() {

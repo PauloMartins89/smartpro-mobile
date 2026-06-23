@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useRouter, useFocusEffect } from 'expo-router'
 import { supabase } from '../../src/lib/supabase'
 import useLiderStore from '../../src/store/useLiderStore'
+import { useFeature } from '../../src/lib/useFeature'
 import { C, fmtDate } from '../../src/lib/theme'
 
 // ── Status ─────────────────────────────────────────────────────────────────
@@ -63,19 +64,27 @@ const sol = StyleSheet.create({
   sub:      { fontSize: 11, color: C.textMuted, marginTop: 1 },
 })
 
-// ── Ações rápidas ──────────────────────────────────────────────────────────
-const ACOES = [
-  { icon: 'restaurant-outline',       label: 'Nova Refeição',  sub: 'Solicitar refeição para equipe',  route: '/solicitacao/refeicao' },
-  { icon: 'cube-outline',             label: 'Novo Insumo',    sub: 'Solicitar insumos com urgência',  route: '/solicitacao/insumo' },
-  { icon: 'shield-checkmark-outline', label: 'Novo EPI',       sub: 'Solicitar EPIs para colaborador', route: '/solicitacao/epi' },
-  { icon: 'list-outline',             label: 'Histórico Ref.', sub: 'Ver todas as refeições e status', route: '/solicitacao/refeicao-historico' },
-]
+// ── Definição base de ações (filtrada por módulo dentro do componente) ────
+const ACOES_DEF = [
+  { modulo: 'modulo_refeicao', icon: 'restaurant-outline',       label: 'Nova Refeição',  sub: 'Solicitar refeição para equipe',  route: '/solicitacao/refeicao' },
+  { modulo: 'modulo_insumo',   icon: 'cube-outline',             label: 'Novo Insumo',    sub: 'Solicitar insumos com urgência',  route: '/solicitacao/insumo' },
+  { modulo: 'modulo_epi',      icon: 'shield-checkmark-outline', label: 'Novo EPI',       sub: 'Solicitar EPIs para colaborador', route: '/solicitacao/epi' },
+  { modulo: 'modulo_refeicao', icon: 'list-outline',             label: 'Histórico Ref.', sub: 'Ver todas as refeições e status', route: '/solicitacao/refeicao-historico' },
+] as const
 
 // ── Tela ───────────────────────────────────────────────────────────────────
 export default function SolicitacoesScreen() {
   const router      = useRouter()
   const liderPerfil = useLiderStore(s => s.liderPerfil)
   const turnoAtivo  = useLiderStore(s => s.turnoAtivo)
+
+  const showRefeicao = useFeature('modulo_refeicao')
+  const showInsumo   = useFeature('modulo_insumo')
+  const showEpi      = useFeature('modulo_epi')
+
+  // Filtra ações pelo módulo habilitado
+  const features: Record<string, boolean> = { modulo_refeicao: showRefeicao, modulo_insumo: showInsumo, modulo_epi: showEpi }
+  const ACOES = ACOES_DEF.filter(a => features[a.modulo])
 
   const [recentes,   setRecentes]   = useState<any[]>([])
   const [loadingSol, setLoadingSol] = useState(false)
@@ -87,17 +96,19 @@ export default function SolicitacoesScreen() {
       setLoadingSol(true)
       try {
         const [resRef, resIns, resEpi] = await Promise.all([
-          supabase.from('lider_solicitacoes_refeicao')
-            .select('id, status, data_refeicao, tipo, created_at')
-            .eq('equipe_id', liderPerfil.equipe_id)
-            .order('created_at', { ascending: false }).limit(5),
-          turnoAtivo?.id
+          showRefeicao
+            ? supabase.from('lider_solicitacoes_refeicao')
+                .select('id, status, data_refeicao, tipo, created_at')
+                .eq('equipe_id', liderPerfil.equipe_id)
+                .order('created_at', { ascending: false }).limit(5)
+            : Promise.resolve({ data: [] }),
+          showInsumo && turnoAtivo?.id
             ? supabase.from('lider_solicitacoes_insumo')
                 .select('id, status, produto_nome, urgencia, created_at')
                 .eq('turno_id', turnoAtivo.id)
                 .order('created_at', { ascending: false }).limit(5)
             : Promise.resolve({ data: [] }),
-          turnoAtivo?.id
+          showEpi && turnoAtivo?.id
             ? supabase.from('lider_solicitacoes_epi')
                 .select('id, status, epi_nome, colaborador_nome, created_at')
                 .eq('turno_id', turnoAtivo.id)

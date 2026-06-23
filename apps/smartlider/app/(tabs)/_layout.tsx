@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Updates from 'expo-updates'
 import useLiderStore from '../../src/store/useLiderStore'
 import useFeatureStore from '../../src/store/useFeatureStore'
+import { useFeature } from '../../src/lib/useFeature'
 import { C, TURNO_LABEL } from '../../src/lib/theme'
 import RightDrawer from '../../src/components/RightDrawer'
 import ClimaBadge from '../../src/components/ClimaBadge'
@@ -17,7 +18,19 @@ export default function TabsLayout() {
   const triggerDashRefresh  = useLiderStore(s => s.triggerDashRefresh)
   const hasHydrated         = useLiderStore(s => s._hasHydrated)
   const workspaceId         = useLiderStore(s => s.workspaceId)
-  const climaOk             = useFeatureStore(s => s.features['condicoes_climaticas'] ?? true)
+  const climaOk   = useFeatureStore(s => s.features['condicoes_climaticas'] ?? true)
+
+  // Aba "Apontamentos" visível se pelo menos 1 módulo de apontamento habilitado
+  const modEfetivo = useFeature('modulo_efetivo')
+  const modMaquina = useFeature('modulo_maquina')
+  const modInsumo  = useFeature('modulo_insumo')
+  const modEpi     = useFeature('modulo_epi')
+  const showTabApontamentos = modEfetivo || modMaquina || modInsumo || modEpi
+
+  // Aba "Solicitações" visível se pelo menos 1 módulo de solicitação habilitado
+  const modRefeicao = useFeature('modulo_refeicao')
+  const showTabSolicitacoes = modRefeicao || modInsumo || modEpi
+
   const [drawerOpen, setDrawerOpen] = useState(false)
   const insets              = useSafeAreaInsets()
 
@@ -101,6 +114,7 @@ export default function TabsLayout() {
           options={{
             title: 'Apontamentos',
             tabBarIcon: ({ color, size }) => <Ionicons name="clipboard-outline" size={size} color={color} />,
+            href: showTabApontamentos ? undefined : null,
           }}
         />
         <Tabs.Screen
@@ -128,6 +142,7 @@ export default function TabsLayout() {
           options={{
             title: 'Solicitações',
             tabBarIcon: ({ color, size }) => <Ionicons name="cart-outline" size={size} color={color} />,
+            href: showTabSolicitacoes ? undefined : null,
           }}
         />
         <Tabs.Screen

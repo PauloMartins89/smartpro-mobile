@@ -7,15 +7,25 @@ import { supabase } from '../lib/supabase'
 // Defaults: features já construídas = true; planejadas mas não buildadas = false
 // O DB pode sobrescrever qualquer valor por workspace
 export const FEATURE_DEFAULTS: Record<string, boolean> = {
-  ocorrencias:          true,   // ✅ construído
-  historico_turnos:     true,   // ✅ construído
-  condicoes_climaticas: true,   // ✅ construído
-  boletim_diario:       false,  // planejado
-  notificacoes_push:    false,  // planejado
-  checklist_seguranca:  false,  // planejado
-  abastecimento:        false,  // planejado
-  right_drawer:         false,  // planejado
-  central_notificacoes: false,  // planejado
+  // ── Sub-features construídas ──────────────────────────────────────────────
+  ocorrencias:          true,
+  historico_turnos:     true,
+  condicoes_climaticas: true,
+  // ── Sub-features planejadas ───────────────────────────────────────────────
+  boletim_diario:       false,
+  notificacoes_push:    false,
+  checklist_seguranca:  false,
+  abastecimento:        false,
+  right_drawer:         false,
+  central_notificacoes: false,
+  // ── Módulos principais (default true = clientes existentes não são afetados)
+  // Módulos: o cliente contrata/habilita individualmente
+  // DDS e Mapas de Campo são integrados — sempre visíveis, não são módulos
+  modulo_refeicao: true,  // Solicitar Refeição + Histórico
+  modulo_efetivo:  true,  // Mão de Obra + Produtividade Equipe + Avaliação
+  modulo_maquina:  true,  // Máquina + Aferição + Produtividade Equipamento
+  modulo_epi:      true,  // Controle EPI + Solicitar EPI
+  modulo_insumo:   true,  // Insumo (apontamento + solicitação)
 }
 
 interface FeatureStore {
